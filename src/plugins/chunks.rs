@@ -37,13 +37,38 @@ struct Attached {
 }
 
 #[derive(Component, Default)]
+#[require(Links)]
 struct Lumina;
+
+#[derive(Component, Default)]
+struct Links {
+    targets: HashSet<Entity>,
+}
+
+#[derive(Resource)]
+struct LuminaDisjointSet {
+    set: disjoint_hash_set::DisjointHashSet<Entity>,
+}
+
+impl Default for LuminaDisjointSet {
+    fn default() -> Self {
+        Self {
+            set: disjoint_hash_set::DisjointHashSet::new(),
+        }
+    }
+}
 
 #[derive(Component, Default)]
 struct Chunk;
 
 #[derive(Component, Default)]
 struct Nearby;
+
+#[derive(Event)]
+struct AttachedChangeEvent {
+    from: Entity,
+    to: Entity,
+}
 
 const CHUNK_SIZE: f32 = 5000.0;
 const CELLS_PER_CHUNK: i32 = 10;
@@ -77,6 +102,7 @@ fn test_draw_lines(
     nearby: Query<(Entity, &GlobalTransform), With<Nearby>>,
     lumina: Query<&GlobalTransform, With<Lumina>>,
     attached: Option<Single<&Attached>>,
+    links: Query<(Entity, &Links)>,
 ) {
     let start_point = ship_transform.translation.xy();
     for (nearby, nearby_transform) in nearby.iter() {
@@ -95,15 +121,25 @@ fn test_draw_lines(
             gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 0.0, 1.0));
         }
     }
+    for (source, links) in links.iter() {
+        for target in links.targets.iter() {
+            if source < *target {
+                let start_point = lumina.get(source).unwrap().translation().xy();
+                let end_point = lumina.get(*target).unwrap().translation().xy();
+                gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 1.0, 0.0));
+            }
+        }
+    }
 }
 
 fn update_nearby_lumina(
     mut commands: Commands,
     chunk_map: Res<Chunks>,
-    ship: Single<(Entity, &Transform), With<Ship>>,
+    ship: Single<(Entity, &Transform, Option<&Attached>), With<Ship>>,
     chunks: Query<&Children, With<Chunk>>,
     lumina: Query<(Entity, &GlobalTransform, Option<&Nearby>), With<Lumina>>,
     nearby: Query<Entity, With<Nearby>>,
+    mut attached_events: EventWriter<AttachedChangeEvent>,
 ) {
     let mut validated = HashSet::<Entity>::new();
     let mut closest_distance = f32::INFINITY;
@@ -136,7 +172,17 @@ fn update_nearby_lumina(
         }
     }
     if let Some(lumina) = closest_lumina {
-        commands.entity(ship.0).insert(Attached { lumina });
+        if let Some(attached) = ship.2 {
+            if attached.lumina != lumina {
+                attached_events.write(AttachedChangeEvent {
+                    from: attached.lumina,
+                    to: lumina,
+                });
+                commands.entity(ship.0).insert(Attached { lumina });
+            }
+        } else {
+            commands.entity(ship.0).insert(Attached { lumina });
+        }
     }
 }
 
@@ -214,15 +260,42 @@ fn populate_nearby_chunks(
     }
 }
 
+fn create_links(
+    mut attached: EventReader<AttachedChangeEvent>,
+    mut links: Query<(Entity, &mut Links)>,
+    mut disjoint_set: ResMut<LuminaDisjointSet>,
+) {
+    for AttachedChangeEvent { from, to } in attached.read() {
+        if let Ok([(from_entity, mut from_links), (to_entity, mut to_links)]) =
+            links.get_many_mut([*from, *to])
+        {
+            if !disjoint_set.set.is_linked(from_entity, to_entity) {
+                disjoint_set.set.link(from_entity, to_entity);
+                from_links.targets.insert(to_entity);
+                to_links.targets.insert(from_entity);
+            }
+        }
+    }
+}
+
 pub struct ChunksPlugin;
 
 impl Plugin for ChunksPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
             .add_systems(Update, populate_nearby_chunks)
-            .add_systems(Update, update_nearby_lumina)
-            .add_systems(Update, test_draw_lines)
+            .add_systems(
+                PostUpdate,
+                update_nearby_lumina.after(TransformSystem::TransformPropagate),
+            )
+            .add_systems(
+                PostUpdate,
+                test_draw_lines.after(TransformSystem::TransformPropagate),
+            )
+            .add_systems(Update, create_links)
             .add_systems(Startup, setup)
-            .insert_resource(Chunks::default());
+            .add_event::<AttachedChangeEvent>()
+            .insert_resource(Chunks::default())
+            .insert_resource(LuminaDisjointSet::default());
     }
 }
