@@ -1,5 +1,5 @@
 use bevy::{
-    platform::collections::HashSet,
+    platform::collections::{HashMap, HashSet},
     prelude::*,
     reflect::TypePath,
     render::render_resource::{AsBindGroup, ShaderRef},
@@ -28,8 +28,17 @@ struct ChunkResources {
 
 #[derive(Resource, Default)]
 struct Chunks {
-    created: HashSet<IVec2>,
+    created: HashMap<IVec2, Entity>,
 }
+
+#[derive(Component, Default)]
+struct Lumina;
+
+#[derive(Component, Default)]
+struct Chunk;
+
+#[derive(Component, Default)]
+struct Nearby;
 
 const CHUNK_SIZE: f32 = 5000.0;
 const CELLS_PER_CHUNK: i32 = 10;
@@ -54,6 +63,63 @@ fn setup(
     });
 }
 
+const NEARBY_DISTANCE: f32 = 200.0;
+
+fn test_draw_lines(
+    mut gizmos: Gizmos,
+    ship_transform: Single<&Transform, With<Ship>>,
+    nearby: Query<&GlobalTransform, With<Nearby>>,
+) {
+    let start_point = ship_transform.translation.xy();
+    for nearby_transform in nearby.iter() {
+        let end_point = nearby_transform.translation().xy();
+        gizmos.line_2d(start_point, end_point, Color::srgb(1.0, 0.0, 0.0));
+    }
+}
+
+fn update_nearby_lumina(
+    mut commands: Commands,
+    chunk_map: Res<Chunks>,
+    ship_transform: Single<&Transform, With<Ship>>,
+    chunks: Query<&Children, With<Chunk>>,
+    lumina: Query<(Entity, &GlobalTransform, Option<&Nearby>), With<Lumina>>,
+    nearby: Query<Entity, With<Nearby>>,
+) {
+    let mut validated = HashSet::<Entity>::new();
+    for chunk_position in iter_surrounding_chunks(ship_transform.translation.xy()) {
+        if let Some(chunk_entity) = chunk_map.created.get(&chunk_position) {
+            if let Ok(children) = chunks.get(*chunk_entity) {
+                for child in children.iter() {
+                    if let Ok((lumina, lumina_transform, nearby)) = lumina.get(child) {
+                        if lumina_transform
+                            .translation()
+                            .distance(ship_transform.translation)
+                            < NEARBY_DISTANCE
+                        {
+                            validated.insert(lumina);
+                            if let None = nearby {
+                                commands.entity(lumina).insert(Nearby);
+                                validated.insert(lumina);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for nearby in nearby.iter() {
+        if !validated.contains(&nearby) {
+            commands.entity(nearby).remove::<Nearby>();
+        }
+    }
+}
+
+fn iter_surrounding_chunks(position: Vec2) -> impl Iterator<Item = IVec2> {
+    let chunk_base = (position / CHUNK_SIZE).floor().as_ivec2();
+
+    (-1..=1).flat_map(move |dx| (-1..=1).map(move |dy| chunk_base + IVec2 { x: dx, y: dy }))
+}
+
 fn populate_nearby_chunks(
     mut commands: Commands,
     mut chunks: ResMut<Chunks>,
@@ -67,16 +133,17 @@ fn populate_nearby_chunks(
         for dx in -1..=1 {
             for dy in -1..=1 {
                 let chunk = chunk + IVec2 { x: dx, y: dy };
-                if chunks.created.contains(&chunk) {
+                if chunks.created.contains_key(&chunk) {
                     continue;
                 }
                 let chunk_position = Vec2 {
                     x: chunk.x as f32 * CHUNK_SIZE + CHUNK_SIZE / 2.0,
                     y: chunk.y as f32 * CHUNK_SIZE + CHUNK_SIZE / 2.0,
                 };
-                chunks.created.insert(chunk);
-                commands
+                let chunk_entity = commands
                     .spawn((
+                        Chunk,
+                        Name::from("Chunk"),
                         Mesh2d(resources.mesh.clone()),
                         MeshMaterial2d(resources.material.clone()),
                         Transform::from_xyz(chunk_position.x, chunk_position.y, -1.0),
@@ -105,13 +172,17 @@ fn populate_nearby_chunks(
                                     y: (0.5 + yi as f32) * cell_size + y_offset,
                                 };
                                 parent.spawn((
+                                    Lumina,
+                                    Name::from("Lumina"),
                                     Mesh2d(resources.resource_mesh.clone()),
                                     MeshMaterial2d(resources.resource_material.clone()),
                                     Transform::from_xyz(position.x, position.y, 1.0),
                                 ));
                             }
                         }
-                    });
+                    })
+                    .id();
+                chunks.created.insert(chunk, chunk_entity);
             }
         }
     }
@@ -123,6 +194,8 @@ impl Plugin for ChunksPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
             .add_systems(Update, populate_nearby_chunks)
+            .add_systems(Update, update_nearby_lumina)
+            .add_systems(Update, test_draw_lines)
             .add_systems(Startup, setup)
             .insert_resource(Chunks::default());
     }
