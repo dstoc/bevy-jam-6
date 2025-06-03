@@ -31,6 +31,11 @@ struct Chunks {
     created: HashMap<IVec2, Entity>,
 }
 
+#[derive(Component)]
+struct Attached {
+    lumina: Entity,
+}
+
 #[derive(Component, Default)]
 struct Lumina;
 
@@ -63,44 +68,62 @@ fn setup(
     });
 }
 
-const NEARBY_DISTANCE: f32 = 200.0;
+const NEARBY_DISTANCE: f32 = 300.0;
+const ATTACH_DISTANCE: f32 = 100.0;
 
 fn test_draw_lines(
     mut gizmos: Gizmos,
     ship_transform: Single<&Transform, With<Ship>>,
-    nearby: Query<&GlobalTransform, With<Nearby>>,
+    nearby: Query<(Entity, &GlobalTransform), With<Nearby>>,
+    lumina: Query<&GlobalTransform, With<Lumina>>,
+    attached: Option<Single<&Attached>>,
 ) {
     let start_point = ship_transform.translation.xy();
-    for nearby_transform in nearby.iter() {
+    for (nearby, nearby_transform) in nearby.iter() {
+        if attached
+            .as_ref()
+            .map_or(false, |attached| nearby == attached.lumina)
+        {
+            continue;
+        }
         let end_point = nearby_transform.translation().xy();
         gizmos.line_2d(start_point, end_point, Color::srgb(1.0, 0.0, 0.0));
+    }
+    if let Some(attached) = attached {
+        if let Ok(lumina_transform) = lumina.get(attached.lumina) {
+            let end_point = lumina_transform.translation().xy();
+            gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 0.0, 1.0));
+        }
     }
 }
 
 fn update_nearby_lumina(
     mut commands: Commands,
     chunk_map: Res<Chunks>,
-    ship_transform: Single<&Transform, With<Ship>>,
+    ship: Single<(Entity, &Transform), With<Ship>>,
     chunks: Query<&Children, With<Chunk>>,
     lumina: Query<(Entity, &GlobalTransform, Option<&Nearby>), With<Lumina>>,
     nearby: Query<Entity, With<Nearby>>,
 ) {
     let mut validated = HashSet::<Entity>::new();
-    for chunk_position in iter_surrounding_chunks(ship_transform.translation.xy()) {
+    let mut closest_distance = f32::INFINITY;
+    let mut closest_lumina = Option::<Entity>::None;
+    for chunk_position in iter_surrounding_chunks(ship.1.translation.xy()) {
         if let Some(chunk_entity) = chunk_map.created.get(&chunk_position) {
             if let Ok(children) = chunks.get(*chunk_entity) {
                 for child in children.iter() {
                     if let Ok((lumina, lumina_transform, nearby)) = lumina.get(child) {
-                        if lumina_transform
-                            .translation()
-                            .distance(ship_transform.translation)
-                            < NEARBY_DISTANCE
-                        {
+                        let distance = lumina_transform.translation().distance(ship.1.translation);
+                        if distance < NEARBY_DISTANCE {
                             validated.insert(lumina);
                             if let None = nearby {
                                 commands.entity(lumina).insert(Nearby);
                                 validated.insert(lumina);
                             }
+                        }
+                        if distance < ATTACH_DISTANCE && distance < closest_distance {
+                            closest_distance = distance;
+                            closest_lumina = Some(lumina);
                         }
                     }
                 }
@@ -111,6 +134,9 @@ fn update_nearby_lumina(
         if !validated.contains(&nearby) {
             commands.entity(nearby).remove::<Nearby>();
         }
+    }
+    if let Some(lumina) = closest_lumina {
+        commands.entity(ship.0).insert(Attached { lumina });
     }
 }
 
