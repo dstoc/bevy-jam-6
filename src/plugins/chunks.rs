@@ -33,13 +33,13 @@ struct Chunks {
 
 #[derive(Component)]
 pub struct Attached {
-    lumina: Entity,
-    in_range: bool,
+    pub lumina: Entity,
+    pub in_range: bool,
 }
 
 #[derive(Component, Default)]
 pub struct Lumina {
-    targets: HashSet<Entity>,
+    pub targets: HashSet<Entity>,
 }
 
 #[derive(Resource)]
@@ -127,7 +127,7 @@ fn test_draw_lines(
             if source < *target {
                 let start_point = lumina.get(source).unwrap().translation().xy();
                 let end_point = lumina.get(*target).unwrap().translation().xy();
-                gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 1.0, 0.0));
+                gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 0.5, 0.0));
             }
         }
     }
@@ -173,28 +173,31 @@ fn update_nearby_lumina(
         }
     }
     if let Some(lumina) = closest_lumina {
-        if let Some(attached) = ship.2 {
+        if if let Some(attached) = ship.2 {
             if attached.lumina != lumina {
                 attached_events.write(AttachedChangeEvent {
                     from: attached.lumina,
                     to: lumina,
                 });
-                commands.entity(ship.0).insert(Attached {
-                    lumina,
-                    in_range: true,
-                });
+                true
+            } else {
+                !attached.in_range
             }
         } else {
+            true
+        } {
             commands.entity(ship.0).insert(Attached {
                 lumina,
                 in_range: true,
             });
         }
     } else if let Some(attached) = ship.2 {
-        commands.entity(ship.0).insert(Attached {
-            in_range: false,
-            ..*attached
-        });
+        if attached.in_range {
+            commands.entity(ship.0).insert(Attached {
+                in_range: false,
+                ..*attached
+            });
+        }
     }
 }
 

@@ -6,11 +6,13 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use iyes_perf_ui::{PerfUiPlugin, entries::PerfUiDefaultEntries};
 use plugins::{
     chunks::ChunksPlugin,
+    energy::EnergyPlugin,
     ship::{Ship, ShipPlugin},
 };
 
 mod plugins {
     pub mod chunks;
+    pub mod energy;
     pub mod ship;
 }
 
@@ -25,6 +27,7 @@ fn main() {
     }))
     .add_plugins(ChunksPlugin)
     .add_plugins(ShipPlugin)
+    .add_plugins(EnergyPlugin)
     .add_systems(Startup, setup)
     .add_systems(Update, zoom_camera);
     #[cfg(debug_assertions)]
