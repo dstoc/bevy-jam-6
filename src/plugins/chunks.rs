@@ -32,16 +32,13 @@ struct Chunks {
 }
 
 #[derive(Component)]
-struct Attached {
+pub struct Attached {
     lumina: Entity,
+    in_range: bool,
 }
 
 #[derive(Component, Default)]
-#[require(Links)]
-struct Lumina;
-
-#[derive(Component, Default)]
-struct Links {
+pub struct Lumina {
     targets: HashSet<Entity>,
 }
 
@@ -102,24 +99,28 @@ fn test_draw_lines(
     nearby: Query<(Entity, &GlobalTransform), With<Nearby>>,
     lumina: Query<&GlobalTransform, With<Lumina>>,
     attached: Option<Single<&Attached>>,
-    links: Query<(Entity, &Links)>,
+    links: Query<(Entity, &Lumina)>,
+    mut disjoint_set: ResMut<LuminaDisjointSet>,
 ) {
-    let start_point = ship_transform.translation.xy();
-    for (nearby, nearby_transform) in nearby.iter() {
-        if attached
-            .as_ref()
-            .map_or(false, |attached| nearby == attached.lumina)
-        {
-            continue;
-        }
-        let end_point = nearby_transform.translation().xy();
-        gizmos.line_2d(start_point, end_point, Color::srgb(1.0, 0.0, 0.0));
-    }
-    if let Some(attached) = attached {
+    let end = ship_transform.translation.xy();
+    if let Some(ref attached) = attached {
         if let Ok(lumina_transform) = lumina.get(attached.lumina) {
-            let end_point = lumina_transform.translation().xy();
-            gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 0.0, 1.0));
+            let start = lumina_transform.translation().xy();
+            gizmos.line_2d(start, end, Color::srgb(0.0, 0.0, 1.0));
         }
+    }
+    for (nearby, nearby_transform) in nearby.iter() {
+        let can_link = attached.as_ref().map_or(true, |attached| {
+            !disjoint_set.set.is_linked(nearby, attached.lumina)
+        });
+        let start = nearby_transform.translation().xy();
+        let end = start + (end - start).clamp_length_max(ATTACH_DISTANCE);
+        let color = if can_link {
+            Color::srgb(0.0, 1.0, 0.0)
+        } else {
+            Color::srgb(1.0, 0.0, 0.0)
+        };
+        gizmos.line_2d(start, end, color);
     }
     for (source, links) in links.iter() {
         for target in links.targets.iter() {
@@ -178,11 +179,22 @@ fn update_nearby_lumina(
                     from: attached.lumina,
                     to: lumina,
                 });
-                commands.entity(ship.0).insert(Attached { lumina });
+                commands.entity(ship.0).insert(Attached {
+                    lumina,
+                    in_range: true,
+                });
             }
         } else {
-            commands.entity(ship.0).insert(Attached { lumina });
+            commands.entity(ship.0).insert(Attached {
+                lumina,
+                in_range: true,
+            });
         }
+    } else if let Some(attached) = ship.2 {
+        commands.entity(ship.0).insert(Attached {
+            in_range: false,
+            ..*attached
+        });
     }
 }
 
@@ -244,7 +256,7 @@ fn populate_nearby_chunks(
                                     y: (0.5 + yi as f32) * cell_size + y_offset,
                                 };
                                 parent.spawn((
-                                    Lumina,
+                                    Lumina::default(),
                                     Name::from("Lumina"),
                                     Mesh2d(resources.resource_mesh.clone()),
                                     MeshMaterial2d(resources.resource_material.clone()),
@@ -262,17 +274,17 @@ fn populate_nearby_chunks(
 
 fn create_links(
     mut attached: EventReader<AttachedChangeEvent>,
-    mut links: Query<(Entity, &mut Links)>,
+    mut lumina: Query<(Entity, &mut Lumina)>,
     mut disjoint_set: ResMut<LuminaDisjointSet>,
 ) {
     for AttachedChangeEvent { from, to } in attached.read() {
-        if let Ok([(from_entity, mut from_links), (to_entity, mut to_links)]) =
-            links.get_many_mut([*from, *to])
+        if let Ok([(from_entity, mut from_lumina), (to_entity, mut to_lumina)]) =
+            lumina.get_many_mut([*from, *to])
         {
             if !disjoint_set.set.is_linked(from_entity, to_entity) {
                 disjoint_set.set.link(from_entity, to_entity);
-                from_links.targets.insert(to_entity);
-                to_links.targets.insert(from_entity);
+                from_lumina.targets.insert(to_entity);
+                to_lumina.targets.insert(from_entity);
             }
         }
     }
