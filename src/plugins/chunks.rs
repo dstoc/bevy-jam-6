@@ -74,6 +74,8 @@ struct AttachedChangeEvent {
 const CHUNK_SIZE: f32 = 5000.0;
 const CELLS_PER_CHUNK: i32 = 10;
 const RESOURCE_DECAY_RATE: f32 = 0.2;
+const NEARBY_DISTANCE: f32 = 300.0;
+const ATTACH_DISTANCE: f32 = 100.0;
 
 fn setup(
     mut commands: Commands,
@@ -95,9 +97,6 @@ fn setup(
         resource_mesh: meshes.add(Circle::new(20.0)).into(),
     });
 }
-
-const NEARBY_DISTANCE: f32 = 300.0;
-const ATTACH_DISTANCE: f32 = 100.0;
 
 fn test_draw_lines(
     mut gizmos: Gizmos,

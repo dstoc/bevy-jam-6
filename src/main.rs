@@ -83,6 +83,10 @@ fn setup(
         Ship::default(),
         Name::from("Ship"),
         Camera2d,
+        Projection::Orthographic(OrthographicProjection {
+            scale: 1.5,
+            ..OrthographicProjection::default_2d()
+        }),
     ));
     commands.spawn((
         Mesh2d(meshes.add(Circle::new(20.0)).into()),
