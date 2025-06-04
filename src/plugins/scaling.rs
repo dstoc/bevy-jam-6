@@ -11,6 +11,8 @@ pub struct Scaling {
     pub capacitor_drain_per_sec: f32,
     pub energy_extraction: f32,
     pub energy_per_force: f32,
+    pub lumina_cooldown_per_generation: f32,
+    pub lumina_resume_per_sec: f32,
 }
 
 impl Default for Scaling {
@@ -20,11 +22,13 @@ impl Default for Scaling {
             propagation_probability: 0.5,
             generation_per_sec: 1.0,
             max_links: 3,
-            max_battery: 2500.0,
-            max_capacitor: 2500.0,
+            max_battery: 1500.0,
+            max_capacitor: 1000.0,
             capacitor_drain_per_sec: 1000.0,
-            energy_extraction: 0.05,
-            energy_per_force: 2.0,
+            energy_extraction: 0.1,
+            energy_per_force: 1.0,
+            lumina_cooldown_per_generation: 0.1,
+            lumina_resume_per_sec: 0.33,
         }
     }
 }

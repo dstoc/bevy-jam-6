@@ -1,5 +1,5 @@
 use super::{
-    chunks::{Attached, Lumina},
+    chunks::{Attached, Cooldown, Lumina},
     scaling::Scaling,
     ship::Ship,
 };
@@ -21,11 +21,33 @@ struct Energy {
     distance: f32,
 }
 
+fn resume_lumina(
+    mut commands: Commands,
+    attached: Option<Single<&Attached>>,
+    cooldown: Query<Entity, With<Cooldown>>,
+    time: Res<Time>,
+    scaling: Res<Scaling>,
+) {
+    for entity in cooldown.iter() {
+        if attached
+            .as_ref()
+            .map_or(false, |attached| attached.lumina == entity)
+        {
+            // don't end cooldown while attached
+            continue;
+        }
+        if rand::rng().random_range(0.0..1.0) < scaling.lumina_resume_per_sec * time.delta_secs() {
+            commands.entity(entity).remove::<Cooldown>();
+        }
+    }
+}
+
 fn generate_energy(
     time: Res<Time>,
     mut commands: Commands,
     attached: Option<Single<&Attached>>,
     lumina: Query<&Lumina>,
+    cooldown: Query<&Cooldown>,
     resources: Res<EnergyResources>,
     scaling: Res<Scaling>,
 ) {
@@ -34,6 +56,9 @@ fn generate_energy(
             return;
         }
         let lumina = lumina.get(attached.lumina).unwrap();
+        if cooldown.contains(attached.lumina) {
+            return;
+        }
         for target in lumina.targets.iter() {
             if rand::rng().random_range(0.0..1.0) > scaling.generation_per_sec * time.delta_secs() {
                 continue;
@@ -50,23 +75,10 @@ fn generate_energy(
                 MeshMaterial2d(resources.material.clone()),
                 Transform::default(),
             ));
-        }
-        if lumina.targets.is_empty() {
-            if rand::rng().random_range(0.0..1.0) > scaling.generation_per_sec * time.delta_secs() {
+            if rand::rng().random_range(0.0..1.0) < scaling.lumina_cooldown_per_generation {
+                commands.entity(attached.lumina).insert(Cooldown);
                 return;
             }
-            commands.spawn((
-                Energy {
-                    target: attached.lumina,
-                    t: 1.0,
-                    path: vec![],
-                    returning: true,
-                    distance: 0.0,
-                },
-                Mesh2d(resources.mesh.clone()),
-                MeshMaterial2d(resources.material.clone()),
-                Transform::default(),
-            ));
         }
     }
 }
@@ -113,41 +125,33 @@ fn move_energy(
                 }
             } else {
                 let to_lumina = lumina.get(to).unwrap().1;
-                if to_lumina.targets.len() == 1 {
-                    // Start returning
-                    energy.returning = true;
-                    energy.target = energy.path.pop().unwrap();
-                    energy.path.push(to);
-                    if rand::rng().random_range(0.0..1.0) > scaling.reflection_probability {
-                        energy.path.clear();
-                    }
-                    energy.t = 0.0;
-                } else {
-                    // Propagate
-                    for target in to_lumina.targets.iter() {
-                        if *target == from {
-                            continue;
-                        }
-                        if rand::rng().random_range(0.0..1.0) > scaling.propagation_probability {
-                            continue;
-                        }
+                for target in to_lumina.targets.iter() {
+                    let terminated = if *target == from {
+                        rand::rng().random_range(0.0..1.0) > scaling.reflection_probability
+                    } else {
+                        rand::rng().random_range(0.0..1.0) > scaling.propagation_probability
+                    };
+                    let path = if terminated {
+                        vec![]
+                    } else {
                         let mut path = energy.path.clone();
                         path.push(to);
-                        commands.spawn((
-                            Energy {
-                                target: *target,
-                                t: 0.0,
-                                path,
-                                returning: false,
-                                distance: energy.distance,
-                            },
-                            Mesh2d(resources.mesh.clone()),
-                            MeshMaterial2d(resources.material.clone()),
-                            Transform::default(),
-                        ));
-                    }
-                    commands.entity(entity).despawn();
+                        path
+                    };
+                    commands.spawn((
+                        Energy {
+                            target: *target,
+                            t: 0.0,
+                            path,
+                            returning: *target == from,
+                            distance: energy.distance,
+                        },
+                        Mesh2d(resources.mesh.clone()),
+                        MeshMaterial2d(resources.material.clone()),
+                        Transform::default(),
+                    ));
                 }
+                commands.entity(entity).despawn();
             }
         }
     }
@@ -200,6 +204,7 @@ impl Plugin for EnergyPlugin {
         app.add_systems(Startup, setup)
             .add_systems(Update, generate_energy)
             .add_systems(Update, deliver_energy)
-            .add_systems(Update, move_energy);
+            .add_systems(Update, move_energy)
+            .add_systems(Update, resume_lumina);
     }
 }

@@ -23,7 +23,8 @@ struct ChunkResources {
     material: Handle<StarfieldMaterial>,
     mesh: Handle<Mesh>,
     resource_mesh: Handle<Mesh>,
-    resource_material: Handle<ColorMaterial>,
+    lumina_material: Handle<ColorMaterial>,
+    lumina_cooldown_material: Handle<ColorMaterial>,
 }
 
 #[derive(Resource, Default)]
@@ -41,6 +42,9 @@ pub struct Attached {
 pub struct Lumina {
     pub targets: HashSet<Entity>,
 }
+
+#[derive(Component)]
+pub struct Cooldown;
 
 #[derive(Resource)]
 struct LuminaDisjointSet {
@@ -85,7 +89,9 @@ fn setup(
                 y: CHUNK_SIZE / 2.0,
             },
         }),
-        resource_material: color_materials.add(ColorMaterial::from(Color::srgb(0.8, 0.3, 0.3))),
+        lumina_material: color_materials.add(ColorMaterial::from(Color::srgb(0.8, 0.3, 0.3))),
+        lumina_cooldown_material: color_materials
+            .add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.3))),
         resource_mesh: meshes.add(Circle::new(20.0)).into(),
     });
 }
@@ -265,7 +271,7 @@ fn populate_nearby_chunks(
                                     Lumina::default(),
                                     Name::from("Lumina"),
                                     Mesh2d(resources.resource_mesh.clone()),
-                                    MeshMaterial2d(resources.resource_material.clone()),
+                                    MeshMaterial2d(resources.lumina_material.clone()),
                                     Transform::from_xyz(position.x, position.y, 1.0),
                                 ));
                             }
@@ -300,6 +306,26 @@ fn create_links(
     }
 }
 
+fn lumina_cooldown_started(
+    mut query: Query<&mut MeshMaterial2d<ColorMaterial>, Added<Cooldown>>,
+    resources: Res<ChunkResources>,
+) {
+    for mut mesh_material in query.iter_mut() {
+        mesh_material.0 = resources.lumina_cooldown_material.clone();
+    }
+}
+fn lumina_cooldown_ended(
+    mut removed: RemovedComponents<Cooldown>,
+    mut query: Query<&mut MeshMaterial2d<ColorMaterial>>,
+    resources: Res<ChunkResources>,
+) {
+    for entity in removed.read() {
+        if let Ok(mut mesh_material) = query.get_mut(entity) {
+            mesh_material.0 = resources.lumina_material.clone();
+        }
+    }
+}
+
 pub struct ChunksPlugin;
 
 impl Plugin for ChunksPlugin {
@@ -314,6 +340,9 @@ impl Plugin for ChunksPlugin {
                 PostUpdate,
                 test_draw_lines.after(TransformSystem::TransformPropagate),
             )
+            .add_systems(Update, create_links)
+            .add_systems(Update, lumina_cooldown_started)
+            .add_systems(Update, lumina_cooldown_ended)
             .add_systems(Update, create_links)
             .add_systems(Startup, setup)
             .add_event::<AttachedChangeEvent>()
