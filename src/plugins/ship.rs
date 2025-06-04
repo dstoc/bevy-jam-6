@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use super::scaling::Scaling;
+
 #[derive(Component)]
 pub struct Ship {
     linear: Vec2,
@@ -20,6 +22,7 @@ fn ship_movement(
     buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
     time: Res<Time>,
+    scaling: Res<Scaling>,
 ) {
     // TODO: use Single
     let (ship_transform, mut ship, camera, camera_transform) = query.single_mut().unwrap();
@@ -38,12 +41,12 @@ fn ship_movement(
             let direction = (world_pos - ship_transform.translation.xy()).normalize_or_zero();
             let force = ship.energy.min(force_magnitude * dt);
             ship.linear += direction * force;
-            ship.energy -= force;
+            ship.energy -= force * scaling.energy_per_force;
         } else if buttons.pressed(MouseButton::Right) {
             if ship.linear.length_squared() > f32::EPSILON {
                 let force = ship.energy.min(force_magnitude * dt);
                 let braking_force_vector = -ship.linear.normalize() * force;
-                ship.energy -= force;
+                ship.energy -= force * scaling.energy_per_force;
                 if ship.linear.dot(ship.linear + braking_force_vector) < 0.0 {
                     ship.linear = Vec2::ZERO;
                 } else {
@@ -54,7 +57,10 @@ fn ship_movement(
             }
         }
     }
-    ship.energy = ship.energy.min(10000.0);
+    if ship.energy > scaling.max_battery {
+        ship.energy -=
+            (scaling.capacitor_drain_per_sec * dt).min(ship.energy - scaling.max_battery);
+    }
 }
 
 fn apply_velocity(mut query: Query<(&mut Transform, &Ship)>, time: Res<Time>) {

@@ -8,6 +8,7 @@ use plugins::{
     chunks::ChunksPlugin,
     energy::EnergyPlugin,
     energy_display::EnergyDisplayPlugin,
+    scaling::ScalingPlugin,
     ship::{Ship, ShipPlugin},
 };
 
@@ -15,6 +16,7 @@ mod plugins {
     pub mod chunks;
     pub mod energy;
     pub mod energy_display;
+    pub mod scaling;
     pub mod ship;
 }
 
@@ -31,6 +33,7 @@ fn main() {
     .add_plugins(ShipPlugin)
     .add_plugins(EnergyPlugin)
     .add_plugins(EnergyDisplayPlugin)
+    .add_plugins(ScalingPlugin)
     .add_systems(Startup, setup)
     .add_systems(Update, zoom_camera);
     #[cfg(debug_assertions)]

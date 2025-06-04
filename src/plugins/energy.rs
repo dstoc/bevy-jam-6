@@ -1,5 +1,6 @@
 use super::{
     chunks::{Attached, Lumina},
+    scaling::Scaling,
     ship::Ship,
 };
 use bevy::prelude::*;
@@ -26,6 +27,7 @@ fn generate_energy(
     attached: Option<Single<&Attached>>,
     lumina: Query<&Lumina>,
     resources: Res<EnergyResources>,
+    scaling: Res<Scaling>,
 ) {
     if let Some(ref attached) = attached {
         if !attached.in_range {
@@ -33,8 +35,7 @@ fn generate_energy(
         }
         let lumina = lumina.get(attached.lumina).unwrap();
         for target in lumina.targets.iter() {
-            // TODO: move to central storage
-            if rand::rng().random_range(0.0..1.0) > time.delta_secs() {
+            if rand::rng().random_range(0.0..1.0) > scaling.generation_per_sec * time.delta_secs() {
                 continue;
             }
             commands.spawn((
@@ -51,8 +52,7 @@ fn generate_energy(
             ));
         }
         if lumina.targets.is_empty() {
-            // TODO: move to central storage
-            if rand::rng().random_range(0.0..1.0) > time.delta_secs() {
+            if rand::rng().random_range(0.0..1.0) > scaling.generation_per_sec * time.delta_secs() {
                 return;
             }
             commands.spawn((
@@ -79,6 +79,7 @@ fn move_energy(
     energy: Query<(Entity, &mut Transform, &mut Energy)>,
     lumina: Query<(&GlobalTransform, &Lumina)>,
     resources: Res<EnergyResources>,
+    scaling: Res<Scaling>,
 ) {
     for (entity, mut transform, mut energy) in energy {
         if energy.path.is_empty() {
@@ -100,22 +101,34 @@ fn move_energy(
         if energy.t >= 1.0 {
             energy.distance += total_distance;
             if energy.returning {
+                // Continue returning
                 energy.path.pop();
                 if energy.path.len() >= 1 {
                     energy.target = energy.path.pop().unwrap();
                     energy.path.push(to);
+                    if rand::rng().random_range(0.0..1.0) > scaling.propagation_probability {
+                        energy.path.clear();
+                    }
                     energy.t = 0.0;
                 }
             } else {
                 let to_lumina = lumina.get(to).unwrap().1;
                 if to_lumina.targets.len() == 1 {
+                    // Start returning
                     energy.returning = true;
                     energy.target = energy.path.pop().unwrap();
                     energy.path.push(to);
+                    if rand::rng().random_range(0.0..1.0) > scaling.reflection_probability {
+                        energy.path.clear();
+                    }
                     energy.t = 0.0;
                 } else {
+                    // Propagate
                     for target in to_lumina.targets.iter() {
                         if *target == from {
+                            continue;
+                        }
+                        if rand::rng().random_range(0.0..1.0) > scaling.propagation_probability {
                             continue;
                         }
                         let mut path = energy.path.clone();
@@ -145,14 +158,14 @@ fn deliver_energy(
     mut ship: Single<&mut Ship>,
     attached: Option<Single<&Attached>>,
     energy: Query<(Entity, &mut Energy)>,
+    scaling: Res<Scaling>,
 ) {
     for (entity, energy) in energy {
         if attached.as_ref().map_or(false, |attached| {
             attached.in_range && energy.target == attached.lumina
         }) && energy.path.is_empty()
         {
-            // energy was emitted at a node with no links
-            ship.energy += 500.0; // TODO: ? energy.distance;
+            ship.energy += energy.distance * scaling.energy_extraction;
             commands.entity(entity).despawn();
         } else if energy.path.is_empty() {
             // energy has finished propagating
@@ -162,10 +175,11 @@ fn deliver_energy(
                 && *energy.path.last().unwrap() == attached.lumina
                 && (energy.returning || energy.path.len() > 1)
         }) {
-            ship.energy += energy.distance;
+            ship.energy += energy.distance * scaling.energy_extraction;
             commands.entity(entity).despawn();
         }
     }
+    ship.energy = ship.energy.min(scaling.max_battery + scaling.max_capacitor);
 }
 
 fn setup(

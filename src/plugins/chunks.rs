@@ -7,7 +7,7 @@ use bevy::{
 };
 use rand::prelude::*;
 
-use super::ship::Ship;
+use super::{scaling::Scaling, ship::Ship};
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 struct StarfieldMaterial {}
@@ -97,16 +97,19 @@ fn test_draw_lines(
     mut gizmos: Gizmos,
     ship_transform: Single<&Transform, With<Ship>>,
     nearby: Query<(Entity, &GlobalTransform), With<Nearby>>,
-    lumina: Query<&GlobalTransform, With<Lumina>>,
+    lumina: Query<(&GlobalTransform, &Lumina)>,
     attached: Option<Single<&Attached>>,
     links: Query<(Entity, &Lumina)>,
     mut disjoint_set: ResMut<LuminaDisjointSet>,
+    scaling: Res<Scaling>,
 ) {
     let end = ship_transform.translation.xy();
     if let Some(ref attached) = attached {
-        if let Ok(lumina_transform) = lumina.get(attached.lumina) {
-            let start = lumina_transform.translation().xy();
-            gizmos.line_2d(start, end, Color::srgb(0.0, 0.0, 1.0));
+        if let Ok((lumina_transform, lumina)) = lumina.get(attached.lumina) {
+            if lumina.targets.len() < scaling.max_links {
+                let start = lumina_transform.translation().xy();
+                gizmos.line_2d(start, end, Color::srgb(0.0, 0.0, 1.0));
+            }
         }
     }
     for (nearby, nearby_transform) in nearby.iter() {
@@ -125,8 +128,8 @@ fn test_draw_lines(
     for (source, links) in links.iter() {
         for target in links.targets.iter() {
             if source < *target {
-                let start_point = lumina.get(source).unwrap().translation().xy();
-                let end_point = lumina.get(*target).unwrap().translation().xy();
+                let start_point = lumina.get(source).unwrap().0.translation().xy();
+                let end_point = lumina.get(*target).unwrap().0.translation().xy();
                 gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 0.5, 0.0));
             }
         }
@@ -279,12 +282,16 @@ fn create_links(
     mut attached: EventReader<AttachedChangeEvent>,
     mut lumina: Query<(Entity, &mut Lumina)>,
     mut disjoint_set: ResMut<LuminaDisjointSet>,
+    scaling: Res<Scaling>,
 ) {
     for AttachedChangeEvent { from, to } in attached.read() {
         if let Ok([(from_entity, mut from_lumina), (to_entity, mut to_lumina)]) =
             lumina.get_many_mut([*from, *to])
         {
-            if !disjoint_set.set.is_linked(from_entity, to_entity) {
+            if !disjoint_set.set.is_linked(from_entity, to_entity)
+                && from_lumina.targets.len() < scaling.max_links
+                && to_lumina.targets.len() < scaling.max_links
+            {
                 disjoint_set.set.link(from_entity, to_entity);
                 from_lumina.targets.insert(to_entity);
                 to_lumina.targets.insert(from_entity);
