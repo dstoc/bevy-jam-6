@@ -7,12 +7,14 @@ use iyes_perf_ui::{PerfUiPlugin, entries::PerfUiDefaultEntries};
 use plugins::{
     chunks::ChunksPlugin,
     energy::EnergyPlugin,
+    energy_display::EnergyDisplayPlugin,
     ship::{Ship, ShipPlugin},
 };
 
 mod plugins {
     pub mod chunks;
     pub mod energy;
+    pub mod energy_display;
     pub mod ship;
 }
 
@@ -28,6 +30,7 @@ fn main() {
     .add_plugins(ChunksPlugin)
     .add_plugins(ShipPlugin)
     .add_plugins(EnergyPlugin)
+    .add_plugins(EnergyDisplayPlugin)
     .add_systems(Startup, setup)
     .add_systems(Update, zoom_camera);
     #[cfg(debug_assertions)]
@@ -74,7 +77,7 @@ fn setup(
         Mesh2d(meshes.add(Circle::new(20.0)).into()),
         MeshMaterial2d(color_materials.add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.8)))),
         Transform::default(),
-        Ship,
+        Ship::default(),
         Name::from("Ship"),
         Camera2d,
     ));

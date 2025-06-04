@@ -1,6 +1,9 @@
-use super::chunks::{Attached, Lumina};
-use bevy::{prelude::*, time::common_conditions::on_timer};
-use std::time::Duration;
+use super::{
+    chunks::{Attached, Lumina},
+    ship::Ship,
+};
+use bevy::prelude::*;
+use rand::Rng;
 
 #[derive(Resource, Default)]
 struct EnergyResources {
@@ -18,6 +21,7 @@ struct Energy {
 }
 
 fn generate_energy(
+    time: Res<Time>,
     mut commands: Commands,
     attached: Option<Single<&Attached>>,
     lumina: Query<&Lumina>,
@@ -29,6 +33,10 @@ fn generate_energy(
         }
         let lumina = lumina.get(attached.lumina).unwrap();
         for target in lumina.targets.iter() {
+            // TODO: move to central storage
+            if rand::rng().random_range(0.0..1.0) > time.delta_secs() {
+                continue;
+            }
             commands.spawn((
                 Energy {
                     target: *target,
@@ -43,6 +51,10 @@ fn generate_energy(
             ));
         }
         if lumina.targets.is_empty() {
+            // TODO: move to central storage
+            if rand::rng().random_range(0.0..1.0) > time.delta_secs() {
+                return;
+            }
             commands.spawn((
                 Energy {
                     target: attached.lumina,
@@ -130,6 +142,7 @@ fn move_energy(
 
 fn deliver_energy(
     mut commands: Commands,
+    mut ship: Single<&mut Ship>,
     attached: Option<Single<&Attached>>,
     energy: Query<(Entity, &mut Energy)>,
 ) {
@@ -139,18 +152,17 @@ fn deliver_energy(
         }) && energy.path.is_empty()
         {
             // energy was emitted at a node with no links
-            info!("received {:?}", energy.distance);
+            ship.energy += 500.0; // TODO: ? energy.distance;
             commands.entity(entity).despawn();
         } else if energy.path.is_empty() {
             // energy has finished propagating
-            info!("wasted {:?}", energy.distance);
             commands.entity(entity).despawn();
         } else if attached.as_ref().map_or(false, |attached| {
             attached.in_range
                 && *energy.path.last().unwrap() == attached.lumina
                 && (energy.returning || energy.path.len() > 1)
         }) {
-            info!("received {:?}", energy.distance);
+            ship.energy += energy.distance;
             commands.entity(entity).despawn();
         }
     }
@@ -172,10 +184,7 @@ pub struct EnergyPlugin;
 impl Plugin for EnergyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
-            .add_systems(
-                Update,
-                generate_energy.run_if(on_timer(Duration::from_secs(1))),
-            )
+            .add_systems(Update, generate_energy)
             .add_systems(Update, deliver_energy)
             .add_systems(Update, move_energy);
     }

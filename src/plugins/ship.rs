@@ -1,23 +1,33 @@
 use bevy::prelude::*;
 
 #[derive(Component)]
-#[require(Velocity)]
-pub struct Ship;
-
-#[derive(Component, Default)]
-struct Velocity {
+pub struct Ship {
     linear: Vec2,
+    pub energy: f32,
+}
+
+impl Default for Ship {
+    fn default() -> Self {
+        Ship {
+            energy: 10000.0,
+            linear: Vec2::default(),
+        }
+    }
 }
 
 fn ship_movement(
-    mut query: Query<(&Transform, &mut Velocity, &Camera, &GlobalTransform), With<Ship>>,
+    mut query: Query<(&Transform, &mut Ship, &Camera, &GlobalTransform)>,
     buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
     time: Res<Time>,
 ) {
-    let (ship_transform, mut ship_velocity, camera, camera_transform) = query.single_mut().unwrap();
+    // TODO: use Single
+    let (ship_transform, mut ship, camera, camera_transform) = query.single_mut().unwrap();
     let force_magnitude = 500.0;
     let dt = time.delta_secs();
+
+    ship.energy =
+        0.0f32.max(ship.energy - ship_transform.translation.distance(Vec3::ZERO).sqrt() * dt);
 
     if let Some(world_pos) = window
         .cursor_position()
@@ -26,27 +36,28 @@ fn ship_movement(
     {
         if buttons.pressed(MouseButton::Left) {
             let direction = (world_pos - ship_transform.translation.xy()).normalize_or_zero();
-            ship_velocity.linear += direction * force_magnitude * dt;
+            let force = ship.energy.min(force_magnitude * dt);
+            ship.linear += direction * force;
+            ship.energy -= force;
         } else if buttons.pressed(MouseButton::Right) {
-            if ship_velocity.linear.length_squared() > f32::EPSILON {
-                let braking_force_vector = -ship_velocity.linear.normalize() * force_magnitude * dt;
-                if ship_velocity
-                    .linear
-                    .dot(ship_velocity.linear + braking_force_vector)
-                    < 0.0
-                {
-                    ship_velocity.linear = Vec2::ZERO;
+            if ship.linear.length_squared() > f32::EPSILON {
+                let force = ship.energy.min(force_magnitude * dt);
+                let braking_force_vector = -ship.linear.normalize() * force;
+                ship.energy -= force;
+                if ship.linear.dot(ship.linear + braking_force_vector) < 0.0 {
+                    ship.linear = Vec2::ZERO;
                 } else {
-                    ship_velocity.linear += braking_force_vector;
+                    ship.linear += braking_force_vector;
                 }
             } else {
-                ship_velocity.linear = Vec2::ZERO;
+                ship.linear = Vec2::ZERO;
             }
         }
     }
+    ship.energy = ship.energy.min(10000.0);
 }
 
-fn apply_velocity(mut query: Query<(&mut Transform, &Velocity), With<Ship>>, time: Res<Time>) {
+fn apply_velocity(mut query: Query<(&mut Transform, &Ship)>, time: Res<Time>) {
     let dt = time.delta_secs();
     for (mut transform, velocity) in query.iter_mut() {
         transform.translation += velocity.linear.extend(0.0) * dt;
@@ -58,6 +69,6 @@ pub struct ShipPlugin;
 impl Plugin for ShipPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, ship_movement)
-            .add_systems(FixedUpdate, apply_velocity);
+            .add_systems(Update, apply_velocity);
     }
 }
