@@ -113,25 +113,27 @@ fn test_draw_lines(
     let end = ship_transform.translation.xy();
     if let Some(ref attached) = attached {
         if let Ok((lumina_transform, lumina)) = lumina.get(attached.lumina) {
-            if lumina.targets.len() < scaling.max_links {
+            if attached.in_range || lumina.targets.len() < scaling.max_links {
                 let start = lumina_transform.translation().xy();
                 gizmos.line_2d(start, end, Color::srgb(0.0, 0.0, 1.0));
             }
         }
     }
-    for (nearby, nearby_transform) in nearby.iter() {
-        let can_link = attached.as_ref().map_or(true, |attached| {
-            !disjoint_set.set.is_linked(nearby, attached.lumina)
-        });
-        let start = nearby_transform.translation().xy();
-        let end = start + (end - start).clamp_length_max(ATTACH_DISTANCE);
-        let color = if can_link {
-            Color::srgb(0.0, 1.0, 0.0)
-        } else {
-            Color::srgb(1.0, 0.0, 0.0)
-        };
-        gizmos.line_2d(start, end, color);
-    }
+
+    // TODO: remove
+    // for (nearby, nearby_transform) in nearby.iter() {
+    //     let can_link = attached.as_ref().map_or(true, |attached| {
+    //         !disjoint_set.set.is_linked(nearby, attached.lumina)
+    //     });
+    //     let start = nearby_transform.translation().xy();
+    //     let end = start + (end - start).clamp_length_max(ATTACH_DISTANCE);
+    //     let color = if can_link {
+    //         Color::srgb(0.0, 1.0, 0.0)
+    //     } else {
+    //         Color::srgb(1.0, 0.0, 0.0)
+    //     };
+    //     gizmos.line_2d(start, end, color);
+    // }
     for (source, links) in links.iter() {
         for target in links.targets.iter() {
             if source < *target {
