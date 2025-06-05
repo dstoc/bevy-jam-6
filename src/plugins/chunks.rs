@@ -7,6 +7,8 @@ use bevy::{
 };
 use rand::prelude::*;
 
+use crate::{GameRunState, GameState};
+
 use super::{scaling::Scaling, ship::Ship};
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
@@ -239,6 +241,7 @@ fn populate_nearby_chunks(
                     .spawn((
                         Chunk,
                         Name::from("Chunk"),
+                        StateScoped(GameState::Playing),
                         Mesh2d(resources.mesh.clone()),
                         MeshMaterial2d(resources.material.clone()),
                         Transform::from_xyz(chunk_position.x, chunk_position.y, -1.0),
@@ -269,6 +272,7 @@ fn populate_nearby_chunks(
                                 parent.spawn((
                                     Lumina::default(),
                                     Name::from("Lumina"),
+                                    StateScoped(GameState::Playing),
                                     Mesh2d(resources.resource_mesh.clone()),
                                     MeshMaterial2d(resources.lumina_material.clone()),
                                     Transform::from_xyz(position.x, position.y, 1.0),
@@ -325,27 +329,35 @@ fn lumina_cooldown_ended(
     }
 }
 
+fn setup_game(mut commands: Commands) {
+    commands.insert_resource(Chunks::default());
+    commands.insert_resource(LuminaDisjointSet::default());
+}
+
 pub struct ChunksPlugin;
 
 impl Plugin for ChunksPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
-            .add_systems(Update, populate_nearby_chunks)
             .add_systems(
                 PostUpdate,
-                update_nearby_lumina.after(TransformSystem::TransformPropagate),
+                (update_nearby_lumina, test_draw_lines)
+                    .after(TransformSystem::TransformPropagate)
+                    .run_if(in_state(GameRunState::Playing)),
             )
             .add_systems(
-                PostUpdate,
-                test_draw_lines.after(TransformSystem::TransformPropagate),
+                Update,
+                (
+                    populate_nearby_chunks,
+                    create_links,
+                    lumina_cooldown_started,
+                    lumina_cooldown_ended,
+                    create_links,
+                )
+                    .run_if(in_state(GameRunState::Playing)),
             )
-            .add_systems(Update, create_links)
-            .add_systems(Update, lumina_cooldown_started)
-            .add_systems(Update, lumina_cooldown_ended)
-            .add_systems(Update, create_links)
+            .add_systems(OnEnter(GameState::Playing), setup_game)
             .add_systems(Startup, setup)
-            .add_event::<AttachedChangeEvent>()
-            .insert_resource(Chunks::default())
-            .insert_resource(LuminaDisjointSet::default());
+            .add_event::<AttachedChangeEvent>();
     }
 }

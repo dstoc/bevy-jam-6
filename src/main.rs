@@ -20,6 +20,29 @@ mod plugins {
     pub mod ship;
 }
 
+#[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
+pub enum AppState {
+    // MainMenu,
+    #[default]
+    InGame,
+}
+
+#[derive(SubStates, Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[source(AppState = AppState::InGame)]
+pub enum GameState {
+    #[default]
+    Playing,
+    // Shop,
+}
+
+#[derive(SubStates, Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[source(GameState = GameState::Playing)]
+pub enum GameRunState {
+    #[default]
+    Playing,
+    // Paused,
+}
+
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -29,12 +52,16 @@ fn main() {
         }),
         ..default()
     }))
+    .init_state::<AppState>()
+    .add_sub_state::<GameState>()
+    .add_sub_state::<GameRunState>()
     .add_plugins(ChunksPlugin)
     .add_plugins(ShipPlugin)
     .add_plugins(EnergyPlugin)
     .add_plugins(EnergyDisplayPlugin)
     .add_plugins(ScalingPlugin)
     .add_systems(Startup, setup)
+    .add_systems(OnEnter(GameState::Playing), setup_game)
     .add_systems(Update, zoom_camera);
     #[cfg(debug_assertions)]
     {
@@ -67,30 +94,29 @@ fn zoom_camera(
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut color_materials: ResMut<Assets<ColorMaterial>>,
-) {
+fn setup(mut commands: Commands) {
     #[cfg(debug_assertions)]
     {
         commands.spawn(PerfUiDefaultEntries::default());
     }
+}
+
+fn setup_game(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut color_materials: ResMut<Assets<ColorMaterial>>,
+) {
     commands.spawn((
+        Name::from("Ship"),
+        Ship::default(),
+        StateScoped(GameState::Playing),
         Mesh2d(meshes.add(Circle::new(20.0)).into()),
         MeshMaterial2d(color_materials.add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.8)))),
         Transform::default(),
-        Ship::default(),
-        Name::from("Ship"),
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scale: 1.5,
             ..OrthographicProjection::default_2d()
         }),
-    ));
-    commands.spawn((
-        Mesh2d(meshes.add(Circle::new(20.0)).into()),
-        MeshMaterial2d(color_materials.add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.8)))),
-        Transform::default(),
     ));
 }

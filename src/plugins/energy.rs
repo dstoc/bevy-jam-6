@@ -1,3 +1,5 @@
+use crate::{GameRunState, GameState};
+
 use super::{
     chunks::{Attached, Cooldown, Lumina},
     scaling::Scaling,
@@ -71,6 +73,8 @@ fn generate_energy(
                     returning: false,
                     distance: 0.0,
                 },
+                Name::from("Energy"),
+                StateScoped(GameState::Playing),
                 Mesh2d(resources.mesh.clone()),
                 MeshMaterial2d(resources.material.clone()),
                 Transform::default(),
@@ -146,6 +150,8 @@ fn move_energy(
                             returning: *target == from,
                             distance: energy.distance,
                         },
+                        Name::from("Energy"),
+                        StateScoped(GameState::Playing),
                         Mesh2d(resources.mesh.clone()),
                         MeshMaterial2d(resources.material.clone()),
                         Transform::default(),
@@ -201,10 +207,10 @@ pub struct EnergyPlugin;
 
 impl Plugin for EnergyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, generate_energy)
-            .add_systems(Update, deliver_energy)
-            .add_systems(Update, move_energy)
-            .add_systems(Update, resume_lumina);
+        app.add_systems(Startup, setup).add_systems(
+            Update,
+            (generate_energy, deliver_energy, move_energy, resume_lumina)
+                .run_if(in_state(GameRunState::Playing)),
+        );
     }
 }

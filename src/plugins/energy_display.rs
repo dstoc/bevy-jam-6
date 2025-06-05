@@ -1,5 +1,7 @@
 use bevy::{color::palettes::css, prelude::*};
 
+use crate::{GameRunState, GameState};
+
 use super::{scaling::Scaling, ship::Ship};
 
 #[derive(Component)]
@@ -8,18 +10,10 @@ struct EnergyText;
 #[derive(Component)]
 struct EnergyFill;
 
-pub struct EnergyDisplayPlugin;
-
-impl Plugin for EnergyDisplayPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_energy_display)
-            .add_systems(Update, update_energy)
-            .add_systems(Update, update_energy_display);
-    }
-}
-
-fn setup_energy_display(mut commands: Commands) {
+fn setup_game(mut commands: Commands) {
     commands.spawn((
+        Name::from("Energy Text"),
+        StateScoped(GameState::Playing),
         Text::new("Energy: 0.0"),
         TextFont {
             font_size: 20.0,
@@ -36,7 +30,8 @@ fn setup_energy_display(mut commands: Commands) {
     ));
     commands
         .spawn((
-            Name::from("Energy Progressbar"),
+            Name::from("Energy Display"),
+            StateScoped(GameState::Playing),
             Node {
                 position_type: PositionType::Absolute,
                 bottom: Val::Px(30.0),
@@ -72,4 +67,16 @@ fn update_energy(
     scaling: Res<Scaling>,
 ) {
     bar.width = Val::Percent(ship.energy / scaling.max_battery * 100.0);
+}
+
+pub struct EnergyDisplayPlugin;
+
+impl Plugin for EnergyDisplayPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(OnEnter(GameState::Playing), setup_game)
+            .add_systems(
+                Update,
+                (update_energy, update_energy_display).run_if(in_state(GameRunState::Playing)),
+            );
+    }
 }

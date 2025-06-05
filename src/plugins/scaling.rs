@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::AppState;
+
 #[derive(Resource)]
 pub struct Scaling {
     pub reflection_probability: f32,
@@ -33,10 +35,14 @@ impl Default for Scaling {
     }
 }
 
+fn setup_game(mut commands: Commands) {
+    commands.insert_resource(Scaling::default());
+}
+
 pub struct ScalingPlugin;
 
 impl Plugin for ScalingPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Scaling::default());
+        app.add_systems(OnEnter(AppState::InGame), setup_game);
     }
 }

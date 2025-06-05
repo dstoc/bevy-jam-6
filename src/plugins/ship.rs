@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::GameRunState;
+
 use super::scaling::Scaling;
 
 #[derive(Component)]
@@ -74,7 +76,13 @@ pub struct ShipPlugin;
 
 impl Plugin for ShipPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, ship_movement)
-            .add_systems(Update, apply_velocity);
+        app.add_systems(
+            Update,
+            ship_movement.run_if(in_state(GameRunState::Playing)),
+        )
+        .add_systems(
+            Update,
+            apply_velocity.run_if(in_state(GameRunState::Playing)),
+        );
     }
 }
