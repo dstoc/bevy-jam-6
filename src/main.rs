@@ -8,6 +8,7 @@ use plugins::{
     chunks::ChunksPlugin,
     energy::EnergyPlugin,
     energy_display::EnergyDisplayPlugin,
+    main_menu::MainMenuPlugin,
     scaling::ScalingPlugin,
     ship::{Ship, ShipPlugin},
 };
@@ -16,19 +17,22 @@ mod plugins {
     pub mod chunks;
     pub mod energy;
     pub mod energy_display;
+    pub mod main_menu;
     pub mod scaling;
     pub mod ship;
 }
 
 #[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[states(scoped_entities)]
 pub enum AppState {
-    // MainMenu,
     #[default]
+    MainMenu,
     InGame,
 }
 
 #[derive(SubStates, Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[source(AppState = AppState::InGame)]
+#[states(scoped_entities)]
 pub enum GameState {
     #[default]
     Playing,
@@ -37,6 +41,7 @@ pub enum GameState {
 
 #[derive(SubStates, Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[source(GameState = GameState::Playing)]
+#[states(scoped_entities)]
 pub enum GameRunState {
     #[default]
     Playing,
@@ -55,6 +60,7 @@ fn main() {
     .init_state::<AppState>()
     .add_sub_state::<GameState>()
     .add_sub_state::<GameRunState>()
+    .add_plugins(MainMenuPlugin)
     .add_plugins(ChunksPlugin)
     .add_plugins(ShipPlugin)
     .add_plugins(EnergyPlugin)
