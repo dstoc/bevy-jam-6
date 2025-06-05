@@ -5,18 +5,15 @@ use bevy_inspector_egui::quick::WorldInspectorPlugin;
 #[cfg(debug_assertions)]
 use iyes_perf_ui::{PerfUiPlugin, entries::PerfUiDefaultEntries};
 use plugins::{
-    chunks::ChunksPlugin,
-    energy::EnergyPlugin,
-    energy_display::EnergyDisplayPlugin,
-    main_menu::MainMenuPlugin,
-    scaling::ScalingPlugin,
-    ship::{Ship, ShipPlugin},
+    chunks::ChunksPlugin, energy::EnergyPlugin, energy_display::EnergyDisplayPlugin,
+    game_loop::GameLoopPlugin, main_menu::MainMenuPlugin, scaling::ScalingPlugin, ship::ShipPlugin,
 };
 
 mod plugins {
     pub mod chunks;
     pub mod energy;
     pub mod energy_display;
+    pub mod game_loop;
     pub mod main_menu;
     pub mod scaling;
     pub mod ship;
@@ -61,13 +58,13 @@ fn main() {
     .add_sub_state::<GameState>()
     .add_sub_state::<GameRunState>()
     .add_plugins(MainMenuPlugin)
+    .add_plugins(GameLoopPlugin)
     .add_plugins(ChunksPlugin)
     .add_plugins(ShipPlugin)
     .add_plugins(EnergyPlugin)
     .add_plugins(EnergyDisplayPlugin)
     .add_plugins(ScalingPlugin)
     .add_systems(Startup, setup)
-    .add_systems(OnEnter(GameState::Playing), setup_game)
     .add_systems(Update, zoom_camera);
     #[cfg(debug_assertions)]
     {
@@ -105,24 +102,4 @@ fn setup(mut commands: Commands) {
     {
         commands.spawn(PerfUiDefaultEntries::default());
     }
-}
-
-fn setup_game(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut color_materials: ResMut<Assets<ColorMaterial>>,
-) {
-    commands.spawn((
-        Name::from("Ship"),
-        Ship::default(),
-        StateScoped(GameState::Playing),
-        Mesh2d(meshes.add(Circle::new(20.0)).into()),
-        MeshMaterial2d(color_materials.add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.8)))),
-        Transform::default(),
-        Camera2d,
-        Projection::Orthographic(OrthographicProjection {
-            scale: 1.5,
-            ..OrthographicProjection::default_2d()
-        }),
-    ));
 }

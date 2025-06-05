@@ -5,7 +5,7 @@ use crate::AppState;
 pub struct MainMenuPlugin;
 
 fn start_game(mut commands: Commands, buttons: Res<ButtonInput<MouseButton>>) {
-    if buttons.pressed(MouseButton::Left) {
+    if buttons.just_released(MouseButton::Left) {
         commands.set_state(AppState::InGame);
     }
 }
