@@ -36,6 +36,7 @@ impl Default for Scaling {
 }
 
 fn setup_game(mut commands: Commands) {
+    info!("init scaling!");
     commands.insert_resource(Scaling::default());
 }
 

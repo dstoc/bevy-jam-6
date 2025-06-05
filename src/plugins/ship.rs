@@ -72,6 +72,12 @@ fn apply_velocity(mut query: Query<(&mut Transform, &Ship)>, time: Res<Time>) {
     }
 }
 
+fn playing_or_ending(state: Option<Res<State<GameRunState>>>) -> bool {
+    state.map_or(false, |state| {
+        *state == GameRunState::Playing || *state == GameRunState::Ending
+    })
+}
+
 pub struct ShipPlugin;
 
 impl Plugin for ShipPlugin {
@@ -80,9 +86,6 @@ impl Plugin for ShipPlugin {
             Update,
             ship_movement.run_if(in_state(GameRunState::Playing)),
         )
-        .add_systems(
-            Update,
-            apply_velocity.run_if(in_state(GameRunState::Playing)),
-        );
+        .add_systems(Update, apply_velocity.run_if(playing_or_ending));
     }
 }

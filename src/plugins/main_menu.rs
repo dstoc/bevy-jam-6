@@ -33,7 +33,7 @@ fn setup_menu(mut commands: Commands) {
                         align_items: AlignItems::Center,
                         ..default()
                     },
-                    BorderColor(Color::BLACK),
+                    BorderColor(Color::WHITE),
                     BorderRadius::MAX,
                     children![(
                         Text::new("Start"),

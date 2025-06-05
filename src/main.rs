@@ -2,6 +2,7 @@ use bevy::{input::mouse::AccumulatedMouseScroll, prelude::*};
 use bevy_egui::EguiPlugin;
 #[cfg(debug_assertions)]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_tweening::TweeningPlugin;
 #[cfg(debug_assertions)]
 use iyes_perf_ui::{PerfUiPlugin, entries::PerfUiDefaultEntries};
 use plugins::{
@@ -41,8 +42,10 @@ pub enum GameState {
 #[states(scoped_entities)]
 pub enum GameRunState {
     #[default]
+    // Starting,
     Playing,
     // Paused,
+    Ending,
 }
 
 fn main() {
@@ -55,6 +58,7 @@ fn main() {
         ..default()
     }))
     .init_state::<AppState>()
+    .insert_resource(ClearColor(Color::BLACK))
     .add_sub_state::<GameState>()
     .add_sub_state::<GameRunState>()
     .add_plugins(MainMenuPlugin)
@@ -64,6 +68,7 @@ fn main() {
     .add_plugins(EnergyPlugin)
     .add_plugins(EnergyDisplayPlugin)
     .add_plugins(ScalingPlugin)
+    .add_plugins(TweeningPlugin)
     .add_systems(Startup, setup)
     .add_systems(Update, zoom_camera);
     #[cfg(debug_assertions)]

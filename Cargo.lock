@@ -462,6 +462,7 @@ dependencies = [
  "bevy",
  "bevy-inspector-egui",
  "bevy_egui",
+ "bevy_tweening",
  "disjoint-hash-set",
  "iyes_perf_ui",
  "rand 0.9.1",
@@ -1406,6 +1407,15 @@ dependencies = [
  "derive_more",
  "serde",
  "thiserror 2.0.12",
+]
+
+[[package]]
+name = "bevy_tweening"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09645a8e66e45f2869fdcbe89a23cd83d030ac647248917bf8512fa86b03ae7a"
+dependencies = [
+ "bevy",
 ]
 
 [[package]]
