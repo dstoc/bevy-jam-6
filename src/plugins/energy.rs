@@ -48,7 +48,7 @@ fn generate_energy(
     time: Res<Time>,
     mut commands: Commands,
     attached: Option<Single<&Attached>>,
-    lumina: Query<&Lumina>,
+    lumina: Query<(&Transform, &Lumina)>,
     cooldown: Query<&Cooldown>,
     resources: Res<EnergyResources>,
     scaling: Res<Scaling>,
@@ -57,7 +57,7 @@ fn generate_energy(
         if !attached.in_range {
             return;
         }
-        let lumina = lumina.get(attached.lumina).unwrap();
+        let (transform, lumina) = lumina.get(attached.lumina).unwrap();
         if cooldown.contains(attached.lumina) {
             return;
         }
@@ -77,7 +77,7 @@ fn generate_energy(
                 StateScoped(GameState::Playing),
                 Mesh2d(resources.mesh.clone()),
                 MeshMaterial2d(resources.material.clone()),
-                Transform::default(),
+                transform.clone(),
             ));
             if rand::rng().random_range(0.0..1.0) < scaling.lumina_cooldown_per_generation {
                 commands.entity(attached.lumina).insert(Cooldown);
@@ -92,8 +92,8 @@ const SPEED: f32 = 500.0;
 fn move_energy(
     mut commands: Commands,
     time: Res<Time>,
-    energy: Query<(Entity, &mut Transform, &mut Energy)>,
-    lumina: Query<(&GlobalTransform, &Lumina)>,
+    energy: Query<(Entity, &mut Transform, &mut Energy), Without<Lumina>>,
+    lumina: Query<(&Transform, &Lumina)>,
     resources: Res<EnergyResources>,
     scaling: Res<Scaling>,
 ) {
@@ -103,8 +103,8 @@ fn move_energy(
         }
         let from = energy.path.last().unwrap().clone();
         let to = energy.target;
-        let from_pos = lumina.get(from).unwrap().0.translation().xy();
-        let to_pos = lumina.get(to).unwrap().0.translation().xy();
+        let from_pos = lumina.get(from).unwrap().0.translation.xy();
+        let to_pos = lumina.get(to).unwrap().0.translation.xy();
         let total_distance = from_pos.distance(to_pos);
         let current_distance = energy.t * total_distance;
         let new_distance = current_distance + time.delta().as_secs_f32() * SPEED;
@@ -154,7 +154,7 @@ fn move_energy(
                         StateScoped(GameState::Playing),
                         Mesh2d(resources.mesh.clone()),
                         MeshMaterial2d(resources.material.clone()),
-                        Transform::default(),
+                        Transform::from_translation(new_pos.extend(0.0)),
                     ));
                 }
                 commands.entity(entity).despawn();

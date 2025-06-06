@@ -64,6 +64,14 @@ impl Default for LuminaDisjointSet {
 #[derive(Component, Default)]
 struct Chunk;
 
+#[derive(Component)]
+#[relationship(relationship_target = Contains)]
+struct ContainedBy(Entity);
+
+#[derive(Component)]
+#[relationship_target(relationship = ContainedBy)]
+struct Contains(Vec<Entity>);
+
 #[derive(Component, Default)]
 struct Nearby;
 
@@ -103,8 +111,8 @@ fn setup(
 fn test_draw_lines(
     mut gizmos: Gizmos,
     ship_transform: Single<&Transform, With<Ship>>,
-    nearby: Query<(Entity, &GlobalTransform), With<Nearby>>,
-    lumina: Query<(&GlobalTransform, &Lumina)>,
+    nearby: Query<(Entity, &Transform), With<Nearby>>,
+    lumina: Query<(&Transform, &Lumina)>,
     attached: Option<Single<&Attached>>,
     links: Query<(Entity, &Lumina)>,
     mut disjoint_set: ResMut<LuminaDisjointSet>,
@@ -114,7 +122,7 @@ fn test_draw_lines(
     if let Some(ref attached) = attached {
         if let Ok((lumina_transform, lumina)) = lumina.get(attached.lumina) {
             if attached.in_range || lumina.targets.len() < scaling.max_links {
-                let start = lumina_transform.translation().xy();
+                let start = lumina_transform.translation.xy();
                 gizmos.line_2d(start, end, Color::srgb(0.0, 0.0, 1.0));
             }
         }
@@ -137,8 +145,8 @@ fn test_draw_lines(
     for (source, links) in links.iter() {
         for target in links.targets.iter() {
             if source < *target {
-                let start_point = lumina.get(source).unwrap().0.translation().xy();
-                let end_point = lumina.get(*target).unwrap().0.translation().xy();
+                let start_point = lumina.get(source).unwrap().0.translation.xy();
+                let end_point = lumina.get(*target).unwrap().0.translation.xy();
                 gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 0.5, 0.0));
             }
         }
@@ -149,8 +157,8 @@ fn update_nearby_lumina(
     mut commands: Commands,
     chunk_map: Res<Chunks>,
     ship: Single<(Entity, &Transform, Option<&Attached>), With<Ship>>,
-    chunks: Query<&Children, With<Chunk>>,
-    lumina: Query<(Entity, &GlobalTransform, Option<&Nearby>), With<Lumina>>,
+    chunks: Query<&Contains, With<Chunk>>,
+    lumina: Query<(Entity, &Transform, Option<&Nearby>), With<Lumina>>,
     nearby: Query<Entity, With<Nearby>>,
     mut attached_events: EventWriter<AttachedChangeEvent>,
 ) {
@@ -162,7 +170,7 @@ fn update_nearby_lumina(
             if let Ok(children) = chunks.get(*chunk_entity) {
                 for child in children.iter() {
                     if let Ok((lumina, lumina_transform, nearby)) = lumina.get(child) {
-                        let distance = lumina_transform.translation().distance(ship.1.translation);
+                        let distance = lumina_transform.translation.distance(ship.1.translation);
                         if distance < NEARBY_DISTANCE {
                             validated.insert(lumina);
                             if let None = nearby {
@@ -231,13 +239,13 @@ fn populate_nearby_chunks(
         let cell_size = CHUNK_SIZE / CELLS_PER_CHUNK as f32;
         for dx in -1..=1 {
             for dy in -1..=1 {
-                let chunk = chunk + IVec2 { x: dx, y: dy };
-                if chunks.created.contains_key(&chunk) {
+                let chunk_index = chunk + IVec2 { x: dx, y: dy };
+                if chunks.created.contains_key(&chunk_index) {
                     continue;
                 }
                 let chunk_position = Vec2 {
-                    x: chunk.x as f32 * CHUNK_SIZE + CHUNK_SIZE / 2.0,
-                    y: chunk.y as f32 * CHUNK_SIZE + CHUNK_SIZE / 2.0,
+                    x: chunk_index.x as f32 * CHUNK_SIZE + CHUNK_SIZE / 2.0,
+                    y: chunk_index.y as f32 * CHUNK_SIZE + CHUNK_SIZE / 2.0,
                 };
                 let chunk_entity = commands
                     .spawn((
@@ -248,42 +256,44 @@ fn populate_nearby_chunks(
                         MeshMaterial2d(resources.material.clone()),
                         Transform::from_xyz(chunk_position.x, chunk_position.y, -1.0),
                     ))
-                    .with_children(|parent| {
-                        for xi in 0..CELLS_PER_CHUNK {
-                            for yi in 0..CELLS_PER_CHUNK {
-                                let distance = (chunk * CELLS_PER_CHUNK
-                                    + IVec2 {
-                                        x: xi as i32,
-                                        y: yi as i32,
-                                    })
-                                .as_vec2()
-                                .length();
-                                let probability =
-                                    (-RESOURCE_DECAY_RATE * distance).exp() * 0.8 + 0.01;
-                                if rand::rng().random_range(0.0..1.0) > probability {
-                                    continue;
-                                }
-                                let x_offset = rand::rng().random_range(-0.4..0.4) * cell_size
-                                    - CHUNK_SIZE / 2.0;
-                                let y_offset = rand::rng().random_range(-0.4..0.4) * cell_size
-                                    - CHUNK_SIZE / 2.0;
-                                let position = Vec2 {
-                                    x: (0.5 + xi as f32) * cell_size + x_offset,
-                                    y: (0.5 + yi as f32) * cell_size + y_offset,
-                                };
-                                parent.spawn((
-                                    Lumina::default(),
-                                    Name::from("Lumina"),
-                                    StateScoped(GameState::Playing),
-                                    Mesh2d(resources.resource_mesh.clone()),
-                                    MeshMaterial2d(resources.lumina_material.clone()),
-                                    Transform::from_xyz(position.x, position.y, 1.0),
-                                ));
-                            }
-                        }
-                    })
                     .id();
-                chunks.created.insert(chunk, chunk_entity);
+                for xi in 0..CELLS_PER_CHUNK {
+                    for yi in 0..CELLS_PER_CHUNK {
+                        let distance = (chunk_index * CELLS_PER_CHUNK
+                            + IVec2 {
+                                x: xi as i32,
+                                y: yi as i32,
+                            })
+                        .as_vec2()
+                        .length();
+                        let probability = (-RESOURCE_DECAY_RATE * distance).exp() * 0.8 + 0.01;
+                        if rand::rng().random_range(0.0..1.0) > probability {
+                            continue;
+                        }
+                        let x_offset =
+                            rand::rng().random_range(-0.4..0.4) * cell_size - CHUNK_SIZE / 2.0;
+                        let y_offset =
+                            rand::rng().random_range(-0.4..0.4) * cell_size - CHUNK_SIZE / 2.0;
+                        let position = Vec2 {
+                            x: (0.5 + xi as f32) * cell_size + x_offset,
+                            y: (0.5 + yi as f32) * cell_size + y_offset,
+                        };
+                        commands.spawn((
+                            Lumina::default(),
+                            Name::from("Lumina"),
+                            ContainedBy(chunk_entity),
+                            StateScoped(GameState::Playing),
+                            Mesh2d(resources.resource_mesh.clone()),
+                            MeshMaterial2d(resources.lumina_material.clone()),
+                            Transform::from_xyz(
+                                position.x + chunk_position.x,
+                                position.y + chunk_position.y,
+                                1.0,
+                            ),
+                        ));
+                    }
+                }
+                chunks.created.insert(chunk_index, chunk_entity);
             }
         }
     }
@@ -342,10 +352,8 @@ impl Plugin for ChunksPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
             .add_systems(
-                PostUpdate,
-                (update_nearby_lumina, test_draw_lines)
-                    .after(TransformSystem::TransformPropagate)
-                    .run_if(in_state(GameRunState::Playing)),
+                Update,
+                (update_nearby_lumina, test_draw_lines).run_if(in_state(GameRunState::Playing)),
             )
             .add_systems(
                 Update,
