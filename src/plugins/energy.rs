@@ -1,11 +1,14 @@
+use std::time::Duration;
+
 use crate::{GameRunState, GameState, materials::lumina_material::LuminaMaterial};
 
 use super::{
     chunks::{Attached, Cooldown, Lumina},
     scaling::Scaling,
-    ship::Ship,
+    ship::{Ship, ShipSprite},
 };
 use bevy::prelude::*;
+use bevy_tweening::{Animator, Tween, lens::SpriteColorLens};
 use rand::Rng;
 
 #[derive(Resource, Default)]
@@ -129,19 +132,20 @@ fn move_energy(
                 }
             } else {
                 let to_lumina = lumina.get(to).unwrap().1;
+                let mut all_terminated = true;
                 for target in to_lumina.targets.iter() {
                     let terminated = if *target == from {
                         rand::rng().random_range(0.0..1.0) > scaling.reflection_probability
                     } else {
                         rand::rng().random_range(0.0..1.0) > scaling.propagation_probability
                     };
-                    let path = if terminated {
-                        vec![]
+                    if terminated {
+                        continue;
                     } else {
-                        let mut path = energy.path.clone();
-                        path.push(to);
-                        path
-                    };
+                        all_terminated = false;
+                    }
+                    let mut path = energy.path.clone();
+                    path.push(to);
                     commands.spawn((
                         Energy {
                             target: *target,
@@ -157,7 +161,11 @@ fn move_energy(
                         Transform::from_translation(new_pos.extend(0.0)),
                     ));
                 }
-                commands.entity(entity).despawn();
+                if all_terminated {
+                    energy.path.clear();
+                } else {
+                    commands.entity(entity).despawn();
+                }
             }
         }
     }
@@ -169,13 +177,16 @@ fn deliver_energy(
     attached: Option<Single<&Attached>>,
     energy: Query<(Entity, &mut Energy)>,
     scaling: Res<Scaling>,
+    ship_sprite: Single<Entity, With<ShipSprite>>,
 ) {
+    let mut animate = false;
     for (entity, energy) in energy {
         if attached.as_ref().map_or(false, |attached| {
             attached.in_range && energy.target == attached.lumina
         }) && energy.path.is_empty()
         {
             ship.energy += energy.distance * scaling.energy_extraction;
+            animate = true;
             commands.entity(entity).despawn();
         } else if energy.path.is_empty() {
             // energy has finished propagating
@@ -183,13 +194,35 @@ fn deliver_energy(
         } else if attached.as_ref().map_or(false, |attached| {
             attached.in_range
                 && *energy.path.last().unwrap() == attached.lumina
-                && (energy.returning || energy.path.len() > 1)
+                && ((energy.returning && energy.t >= 1.0)
+                    || (energy.path.len() > 1 && energy.t == 0.0))
         }) {
             ship.energy += energy.distance * scaling.energy_extraction;
+            animate = true;
             commands.entity(entity).despawn();
         }
     }
     ship.energy = ship.energy.min(scaling.max_battery + scaling.max_capacitor);
+    if animate {
+        commands.entity(*ship_sprite).insert(Animator::new(
+            Tween::new(
+                EaseFunction::QuinticIn,
+                Duration::from_millis(100),
+                SpriteColorLens {
+                    start: Color::srgb(1.0, 1.0, 1.0),
+                    end: Color::srgb(10.0, 10.0, 10.0),
+                },
+            )
+            .then(Tween::new(
+                EaseFunction::QuinticOut,
+                Duration::from_millis(500),
+                SpriteColorLens {
+                    start: Color::srgb(10.0, 10.0, 10.0),
+                    end: Color::srgb(1.0, 1.0, 1.0),
+                },
+            )),
+        ));
+    }
 }
 
 fn setup(

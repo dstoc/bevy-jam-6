@@ -1,8 +1,13 @@
+use std::f32::consts::FRAC_PI_2;
+
 use bevy::prelude::*;
 
 use crate::GameRunState;
 
 use super::scaling::Scaling;
+
+#[derive(Component)]
+pub struct ShipSprite;
 
 #[derive(Component)]
 pub struct Ship {
@@ -20,14 +25,14 @@ impl Default for Ship {
 }
 
 fn ship_movement(
-    mut query: Query<(&Transform, &mut Ship, &Camera, &GlobalTransform)>,
+    ship: Single<(&Transform, &mut Ship, &Camera, &GlobalTransform)>,
     buttons: Res<ButtonInput<MouseButton>>,
     window: Single<&Window>,
     time: Res<Time>,
     scaling: Res<Scaling>,
+    mut ship_sprite: Single<&mut Transform, (With<ShipSprite>, Without<Ship>)>,
 ) {
-    // TODO: use Single
-    let (ship_transform, mut ship, camera, camera_transform) = query.single_mut().unwrap();
+    let (ship_transform, mut ship, camera, camera_transform) = ship.into_inner();
     let force_magnitude = 500.0;
     let dt = time.delta_secs();
 
@@ -48,11 +53,14 @@ fn ship_movement(
             let force = ship.energy.min(force_magnitude * dt);
             ship.linear += direction * force;
             ship.energy -= force * scaling.energy_per_force;
+            ship_sprite.rotation = Quat::from_rotation_z(direction.to_angle() - FRAC_PI_2);
         } else if buttons.pressed(MouseButton::Right) {
             if ship.linear.length_squared() > f32::EPSILON {
                 let force = ship.energy.min(force_magnitude * dt);
                 let braking_force_vector = -ship.linear.normalize() * force;
                 ship.energy -= force * scaling.energy_per_force;
+                ship_sprite.rotation =
+                    Quat::from_rotation_z(braking_force_vector.to_angle() - FRAC_PI_2);
                 if ship.linear.dot(ship.linear + braking_force_vector) < 0.0 {
                     ship.linear = Vec2::ZERO;
                 } else {

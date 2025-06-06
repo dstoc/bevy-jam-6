@@ -5,21 +5,15 @@ use bevy_tweening::{Animator, Tween, TweenCompleted, lens::UiBackgroundColorLens
 
 use crate::{GameRunState, GameState};
 
-use super::ship::Ship;
+use super::ship::{Ship, ShipSprite};
 
 pub struct GameLoopPlugin;
 
-fn setup_run(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut color_materials: ResMut<Assets<ColorMaterial>>,
-) {
+fn setup_run(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Name::from("Ship"),
         Ship::default(),
         StateScoped(GameState::Playing),
-        Mesh2d(meshes.add(Circle::new(20.0)).into()),
-        MeshMaterial2d(color_materials.add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.8)))),
         Transform::default(),
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
@@ -34,6 +28,18 @@ fn setup_run(
         bevy::core_pipeline::tonemapping::Tonemapping::TonyMcMapface,
         bevy::core_pipeline::bloom::Bloom::default(),
         bevy::core_pipeline::tonemapping::DebandDither::Enabled,
+        children![(
+            ShipSprite,
+            Sprite {
+                image: asset_server.load("ship.png"),
+                ..default()
+            },
+            Transform::from_scale(Vec3 {
+                x: 0.4,
+                y: 0.4,
+                z: 1.0,
+            }),
+        )],
     ));
 }
 
