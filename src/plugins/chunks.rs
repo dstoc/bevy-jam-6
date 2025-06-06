@@ -12,7 +12,10 @@ use crate::{GameRunState, GameState, materials::link_material::LinkMaterial};
 use super::{scaling::Scaling, ship::Ship};
 
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct StarfieldMaterial {}
+struct StarfieldMaterial {
+    #[uniform(0)]
+    pub camera: Vec2,
+}
 
 impl Material2d for StarfieldMaterial {
     fn fragment_shader() -> ShaderRef {
@@ -100,7 +103,9 @@ fn setup(
     mut color_materials: ResMut<Assets<ColorMaterial>>,
 ) {
     commands.insert_resource(ChunkResources {
-        material: starfield_materials.add(StarfieldMaterial {}),
+        material: starfield_materials.add(StarfieldMaterial {
+            camera: Vec2::default(),
+        }),
         mesh: meshes.add(Rectangle {
             half_size: Vec2 {
                 x: CHUNK_SIZE / 2.0,
@@ -118,6 +123,15 @@ fn setup(
             noise_speed: 2.0,
         }),
     });
+}
+
+fn update_starfield(
+    resources: Res<ChunkResources>,
+    camera_transform: Single<&Transform, With<Ship>>,
+    mut starfield_materials: ResMut<Assets<StarfieldMaterial>>,
+) {
+    let material = starfield_materials.get_mut(&resources.material).unwrap();
+    material.camera = camera_transform.translation.xy();
 }
 
 fn update_attachment_line(
@@ -408,8 +422,12 @@ impl Plugin for ChunksPlugin {
             .add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
             .add_systems(
                 Update,
-                (update_nearby_lumina, update_attachment_line)
-                    .run_if(in_state(GameRunState::Playing)),
+                (
+                    update_nearby_lumina,
+                    update_attachment_line,
+                    update_starfield,
+                )
+                    .run_if(in_state(GameRunState::Playing).or(in_state(GameRunState::Ending))),
             )
             .add_systems(
                 Update,
