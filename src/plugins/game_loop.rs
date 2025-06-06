@@ -115,7 +115,7 @@ impl Plugin for GameLoopPlugin {
             .add_systems(OnEnter(FadeState::Ready), reveal)
             .add_systems(
                 OnEnter(GameRunState::Ending),
-                fade(FADE_OUT, AppState::MainMenu),
+                fade(FADE_OUT, GameState::Story),
             )
             .add_systems(
                 OnEnter(GameRunState::Playing),

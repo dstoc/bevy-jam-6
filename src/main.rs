@@ -7,7 +7,8 @@ use bevy_tweening::TweeningPlugin;
 use iyes_perf_ui::{PerfUiPlugin, entries::PerfUiDefaultEntries};
 use plugins::{
     chunks::ChunksPlugin, energy::EnergyPlugin, energy_display::EnergyDisplayPlugin,
-    game_loop::GameLoopPlugin, main_menu::MainMenuPlugin, scaling::ScalingPlugin, ship::ShipPlugin,
+    game_loop::GameLoopPlugin, main_menu::MainMenuPlugin, pause_menu::PauseMenuPlugin,
+    scaling::ScalingPlugin, ship::ShipPlugin, shop::ShopPlugin, story::StoryPlugin,
 };
 
 mod plugins {
@@ -16,8 +17,11 @@ mod plugins {
     pub mod energy_display;
     pub mod game_loop;
     pub mod main_menu;
+    pub mod pause_menu;
     pub mod scaling;
     pub mod ship;
+    pub mod shop;
+    pub mod story;
 }
 
 #[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -34,7 +38,8 @@ pub enum AppState {
 pub enum GameState {
     #[default]
     Playing,
-    // Shop,
+    Story,
+    Shop,
 }
 
 #[derive(SubStates, Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -44,7 +49,7 @@ pub enum GameRunState {
     #[default]
     // Starting,
     Playing,
-    // Paused,
+    Paused,
     Ending,
 }
 
@@ -62,7 +67,10 @@ fn main() {
     .add_sub_state::<GameState>()
     .add_sub_state::<GameRunState>()
     .add_plugins(MainMenuPlugin)
+    .add_plugins(PauseMenuPlugin)
     .add_plugins(GameLoopPlugin)
+    .add_plugins(StoryPlugin)
+    .add_plugins(ShopPlugin)
     .add_plugins(ChunksPlugin)
     .add_plugins(ShipPlugin)
     .add_plugins(EnergyPlugin)
