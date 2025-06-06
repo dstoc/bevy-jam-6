@@ -7,7 +7,10 @@ use bevy::{
 };
 use rand::prelude::*;
 
-use crate::{GameRunState, GameState, materials::link_material::LinkMaterial};
+use crate::{
+    GameRunState, GameState,
+    materials::{link_material::LinkMaterial, lumina_material::LuminaMaterial},
+};
 
 use super::{scaling::Scaling, ship::Ship};
 
@@ -28,8 +31,8 @@ struct ChunkResources {
     material: Handle<StarfieldMaterial>,
     mesh: Handle<Mesh>,
     resource_mesh: Handle<Mesh>,
-    lumina_material: Handle<ColorMaterial>,
-    lumina_cooldown_material: Handle<ColorMaterial>,
+    lumina_material: Handle<LuminaMaterial>,
+    lumina_cooldown_material: Handle<LuminaMaterial>,
     line_mesh: Handle<Mesh>,
     link_material: Handle<LinkMaterial>,
 }
@@ -100,7 +103,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut starfield_materials: ResMut<Assets<StarfieldMaterial>>,
     mut link_materials: ResMut<Assets<LinkMaterial>>,
-    mut color_materials: ResMut<Assets<ColorMaterial>>,
+    mut lumina_materials: ResMut<Assets<LuminaMaterial>>,
 ) {
     commands.insert_resource(ChunkResources {
         material: starfield_materials.add(StarfieldMaterial {
@@ -112,13 +115,23 @@ fn setup(
                 y: CHUNK_SIZE / 2.0,
             },
         }),
-        lumina_material: color_materials.add(ColorMaterial::from(Color::srgb(0.8, 0.3, 0.3))),
-        lumina_cooldown_material: color_materials
-            .add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.3))),
-        resource_mesh: meshes.add(Circle::new(20.0)).into(),
+        lumina_material: lumina_materials.add(LuminaMaterial {
+            base_color: LinearRgba::rgb(0.0, 0.3, 0.8),
+            fill_color: LinearRgba::rgb(0.0, 0.0, 0.0),
+            bloom: 75.0,
+            freq: 2.0,
+        }),
+        lumina_cooldown_material: lumina_materials.add(LuminaMaterial {
+            base_color: LinearRgba::rgb(0.0, 0.15, 0.4),
+            fill_color: LinearRgba::rgb(0.0, 0.0, 0.0),
+            bloom: 1.0,
+            freq: 2.0,
+        }),
+        resource_mesh: meshes.add(Circle::new(40.0)).into(),
         line_mesh: meshes.add(Mesh::from(Rectangle::default())),
         link_material: link_materials.add(LinkMaterial {
-            base_color: LinearRgba::rgb(0.5, 0.5, 0.0),
+            base_color: LinearRgba::rgb(0.0, 0.3, 0.8),
+            bloom: 5.0,
             noise_freq: 0.02,
             noise_speed: 2.0,
         }),
@@ -159,7 +172,7 @@ fn update_attachment_line(
                 visibility = Visibility::Visible;
                 let link_material = link_materials.get_mut(&line.2.0).unwrap();
                 link_material.base_color = if attached.in_range {
-                    LinearRgba::rgb(0.5, 0.5, 0.0)
+                    LinearRgba::rgb(0.0, 0.15, 0.4)
                 } else {
                     LinearRgba::rgb(0.1, 0.1, 0.1)
                 };
@@ -374,7 +387,7 @@ fn transform_for_line(p0: Vec2, p1: Vec2, thickness: f32) -> Transform {
 }
 
 fn lumina_cooldown_started(
-    mut query: Query<&mut MeshMaterial2d<ColorMaterial>, Added<Cooldown>>,
+    mut query: Query<&mut MeshMaterial2d<LuminaMaterial>, Added<Cooldown>>,
     resources: Res<ChunkResources>,
 ) {
     for mut mesh_material in query.iter_mut() {
@@ -383,7 +396,7 @@ fn lumina_cooldown_started(
 }
 fn lumina_cooldown_ended(
     mut removed: RemovedComponents<Cooldown>,
-    mut query: Query<&mut MeshMaterial2d<ColorMaterial>>,
+    mut query: Query<&mut MeshMaterial2d<LuminaMaterial>>,
     resources: Res<ChunkResources>,
 ) {
     for entity in removed.read() {
@@ -406,6 +419,7 @@ fn setup_game(
         Mesh2d(resources.line_mesh.clone()),
         MeshMaterial2d(link_materials.add(LinkMaterial {
             base_color: LinearRgba::rgb(0.0, 1.0, 1.0),
+            bloom: 1.0,
             noise_freq: 0.02,
             noise_speed: 2.0,
         })),
@@ -420,6 +434,7 @@ impl Plugin for ChunksPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(Material2dPlugin::<LinkMaterial>::default())
             .add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
+            .add_plugins(Material2dPlugin::<LuminaMaterial>::default())
             .add_systems(
                 Update,
                 (

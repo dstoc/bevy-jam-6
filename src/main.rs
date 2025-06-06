@@ -26,6 +26,7 @@ mod plugins {
 
 mod materials {
     pub mod link_material;
+    pub mod lumina_material;
 }
 
 #[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]

@@ -9,6 +9,7 @@
 
 struct CustomMaterial {
     base_color: vec4<f32>,
+    bloom: f32,
     wave_freq: f32,
     wave_speed: f32,
 };
@@ -72,7 +73,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
 
-    return color;
+    return color * mat.bloom;
     // return vec4<f32>(1.0, 1.0, 1.0, line);
 }
 

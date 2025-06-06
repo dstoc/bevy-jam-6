@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::{prelude::*, state::state::FreelyMutableState};
 use bevy_tweening::{Animator, Tween, TweenCompleted, lens::UiBackgroundColorLens};
 
-use crate::{AppState, GameRunState, GameState};
+use crate::{GameRunState, GameState};
 
 use super::ship::Ship;
 

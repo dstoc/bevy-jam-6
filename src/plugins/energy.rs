@@ -1,4 +1,4 @@
-use crate::{GameRunState, GameState};
+use crate::{GameRunState, GameState, materials::lumina_material::LuminaMaterial};
 
 use super::{
     chunks::{Attached, Cooldown, Lumina},
@@ -11,7 +11,7 @@ use rand::Rng;
 #[derive(Resource, Default)]
 struct EnergyResources {
     mesh: Handle<Mesh>,
-    material: Handle<ColorMaterial>,
+    material: Handle<LuminaMaterial>,
 }
 
 #[derive(Component)]
@@ -195,10 +195,15 @@ fn deliver_energy(
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut color_materials: ResMut<Assets<ColorMaterial>>,
+    mut lumina_materials: ResMut<Assets<LuminaMaterial>>,
 ) {
     commands.insert_resource(EnergyResources {
-        material: color_materials.add(ColorMaterial::from(Color::srgb(0.2, 0.7, 0.8))),
+        material: lumina_materials.add(LuminaMaterial {
+            base_color: LinearRgba::rgb(0.0, 0.3, 0.8),
+            fill_color: LinearRgba::rgb(0.0, 0.3, 0.8),
+            bloom: 75.0,
+            freq: 2.0,
+        }),
         mesh: meshes.add(Circle::new(10.0)).into(),
     });
 }
