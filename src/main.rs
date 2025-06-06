@@ -24,6 +24,10 @@ mod plugins {
     pub mod story;
 }
 
+mod materials {
+    pub mod link_material;
+}
+
 #[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[states(scoped_entities)]
 pub enum AppState {

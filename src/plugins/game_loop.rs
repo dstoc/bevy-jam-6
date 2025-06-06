@@ -26,6 +26,14 @@ fn setup_run(
             scale: 1.5,
             ..OrthographicProjection::default_2d()
         }),
+        Camera {
+            hdr: true,
+            clear_color: ClearColorConfig::Custom(Color::BLACK),
+            ..default()
+        },
+        bevy::core_pipeline::tonemapping::Tonemapping::TonyMcMapface,
+        bevy::core_pipeline::bloom::Bloom::default(),
+        bevy::core_pipeline::tonemapping::DebandDither::Enabled,
     ));
 }
 

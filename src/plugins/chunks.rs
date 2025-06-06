@@ -7,7 +7,7 @@ use bevy::{
 };
 use rand::prelude::*;
 
-use crate::{GameRunState, GameState};
+use crate::{GameRunState, GameState, materials::link_material::LinkMaterial};
 
 use super::{scaling::Scaling, ship::Ship};
 
@@ -28,6 +28,7 @@ struct ChunkResources {
     lumina_material: Handle<ColorMaterial>,
     lumina_cooldown_material: Handle<ColorMaterial>,
     line_mesh: Handle<Mesh>,
+    link_material: Handle<LinkMaterial>,
 }
 
 #[derive(Resource, Default)]
@@ -94,11 +95,12 @@ const ATTACH_DISTANCE: f32 = 100.0;
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StarfieldMaterial>>,
+    mut starfield_materials: ResMut<Assets<StarfieldMaterial>>,
+    mut link_materials: ResMut<Assets<LinkMaterial>>,
     mut color_materials: ResMut<Assets<ColorMaterial>>,
 ) {
     commands.insert_resource(ChunkResources {
-        material: materials.add(StarfieldMaterial {}),
+        material: starfield_materials.add(StarfieldMaterial {}),
         mesh: meshes.add(Rectangle {
             half_size: Vec2 {
                 x: CHUNK_SIZE / 2.0,
@@ -110,6 +112,11 @@ fn setup(
             .add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.3))),
         resource_mesh: meshes.add(Circle::new(20.0)).into(),
         line_mesh: meshes.add(Mesh::from(Rectangle::default())),
+        link_material: link_materials.add(LinkMaterial {
+            base_color: LinearRgba::rgb(0.5, 0.5, 0.0),
+            noise_freq: 0.02,
+            noise_speed: 2.0,
+        }),
     });
 }
 
@@ -119,9 +126,14 @@ fn update_attachment_line(
     attached: Option<Single<&Attached>>,
     scaling: Res<Scaling>,
     mut line: Single<
-        (Entity, &mut Transform, &AttachmentLine, &mut Visibility),
-        (Without<Lumina>, Without<Ship>),
+        (
+            &mut Transform,
+            &mut Visibility,
+            &MeshMaterial2d<LinkMaterial>,
+        ),
+        (With<AttachmentLine>, Without<Lumina>, Without<Ship>),
     >,
+    mut link_materials: ResMut<Assets<LinkMaterial>>,
 ) {
     let end = ship_transform.translation.xy();
     let mut visibility = Visibility::Hidden;
@@ -129,13 +141,19 @@ fn update_attachment_line(
         if let Ok((lumina_transform, lumina)) = lumina.get(attached.lumina) {
             if attached.in_range || lumina.targets.len() < scaling.max_links {
                 let start = lumina_transform.translation.xy();
-                *line.1 = transform_for_line(start, end, 1.0);
+                *line.0 = transform_for_line(start, end, 20.0);
                 visibility = Visibility::Visible;
+                let link_material = link_materials.get_mut(&line.2.0).unwrap();
+                link_material.base_color = if attached.in_range {
+                    LinearRgba::rgb(0.5, 0.5, 0.0)
+                } else {
+                    LinearRgba::rgb(0.1, 0.1, 0.1)
+                };
             }
         }
     }
-    if *line.3 != visibility {
-        *line.3 = visibility;
+    if *line.1 != visibility {
+        *line.1 = visibility;
     }
 }
 
@@ -240,7 +258,7 @@ fn populate_nearby_chunks(
                         StateScoped(GameState::Playing),
                         Mesh2d(resources.mesh.clone()),
                         MeshMaterial2d(resources.material.clone()),
-                        Transform::from_xyz(chunk_position.x, chunk_position.y, -1.0),
+                        Transform::from_xyz(chunk_position.x, chunk_position.y, -10.0),
                     ))
                     .id();
                 for xi in 0..CELLS_PER_CHUNK {
@@ -311,11 +329,11 @@ fn create_links(
                 commands.spawn((
                     StateScoped(GameState::Playing),
                     Mesh2d(resources.line_mesh.clone()),
-                    MeshMaterial2d(resources.lumina_material.clone()),
+                    MeshMaterial2d(resources.link_material.clone()),
                     transform_for_line(
                         from_transform.translation.xy(),
                         to_transform.translation.xy(),
-                        1.0,
+                        20.0,
                     ),
                 ));
             }
@@ -335,7 +353,7 @@ fn transform_for_line(p0: Vec2, p1: Vec2, thickness: f32) -> Transform {
     let rotation = Quat::from_rotation_arc(Vec3::X, dir3);
 
     Transform {
-        translation: Vec3::new(midpoint.x, midpoint.y, 0.0),
+        translation: Vec3::new(midpoint.x, midpoint.y, -5.0),
         rotation,
         scale: Vec3::new(length, thickness, 1.0),
     }
@@ -361,14 +379,22 @@ fn lumina_cooldown_ended(
     }
 }
 
-fn setup_game(mut commands: Commands, resources: Res<ChunkResources>) {
+fn setup_game(
+    mut commands: Commands,
+    resources: Res<ChunkResources>,
+    mut link_materials: ResMut<Assets<LinkMaterial>>,
+) {
     commands.insert_resource(Chunks::default());
     commands.insert_resource(LuminaDisjointSet::default());
     commands.spawn((
         AttachmentLine,
         StateScoped(GameState::Playing),
         Mesh2d(resources.line_mesh.clone()),
-        MeshMaterial2d(resources.lumina_material.clone()),
+        MeshMaterial2d(link_materials.add(LinkMaterial {
+            base_color: LinearRgba::rgb(0.0, 1.0, 1.0),
+            noise_freq: 0.02,
+            noise_speed: 2.0,
+        })),
         Transform::default(),
         Visibility::Hidden,
     ));
@@ -378,7 +404,8 @@ pub struct ChunksPlugin;
 
 impl Plugin for ChunksPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
+        app.add_plugins(Material2dPlugin::<LinkMaterial>::default())
+            .add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
             .add_systems(
                 Update,
                 (update_nearby_lumina, update_attachment_line)
