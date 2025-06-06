@@ -15,6 +15,7 @@ pub struct Scaling {
     pub energy_per_force: f32,
     pub lumina_cooldown_per_generation: f32,
     pub lumina_resume_per_sec: f32,
+    pub life_support_per_distance: f32,
 }
 
 impl Default for Scaling {
@@ -31,6 +32,7 @@ impl Default for Scaling {
             energy_per_force: 1.0,
             lumina_cooldown_per_generation: 0.1,
             lumina_resume_per_sec: 0.33,
+            life_support_per_distance: 1.0 / 30.0,
         }
     }
 }

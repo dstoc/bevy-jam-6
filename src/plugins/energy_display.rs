@@ -57,8 +57,15 @@ fn setup_game(mut commands: Commands) {
         });
 }
 
-fn update_energy_display(ship: Single<&Ship>, mut energy: Single<&mut Text, With<EnergyText>>) {
-    energy.0 = format!("Energy: {:.1}", ship.energy);
+fn update_energy_display(
+    ship: Single<(&Ship, &Transform)>,
+    mut energy: Single<&mut Text, With<EnergyText>>,
+) {
+    energy.0 = format!(
+        "Energy: {:.1}\nDistance: {:.0}",
+        ship.0.energy,
+        ship.1.translation.length()
+    );
 }
 
 fn update_energy(

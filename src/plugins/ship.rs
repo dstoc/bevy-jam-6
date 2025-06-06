@@ -31,8 +31,12 @@ fn ship_movement(
     let force_magnitude = 500.0;
     let dt = time.delta_secs();
 
-    ship.energy =
-        0.0f32.max(ship.energy - ship_transform.translation.distance(Vec3::ZERO).sqrt() * dt);
+    ship.energy = 0.0f32.max(
+        ship.energy
+            - ship_transform.translation.distance(Vec3::ZERO)
+                * scaling.life_support_per_distance
+                * dt,
+    );
 
     if let Some(world_pos) = window
         .cursor_position()
