@@ -27,6 +27,7 @@ struct ChunkResources {
     resource_mesh: Handle<Mesh>,
     lumina_material: Handle<ColorMaterial>,
     lumina_cooldown_material: Handle<ColorMaterial>,
+    line_mesh: Handle<Mesh>,
 }
 
 #[derive(Resource, Default)]
@@ -81,6 +82,9 @@ struct AttachedChangeEvent {
     to: Entity,
 }
 
+#[derive(Component)]
+struct AttachmentLine;
+
 const CHUNK_SIZE: f32 = 5000.0;
 const CELLS_PER_CHUNK: i32 = 10;
 const RESOURCE_DECAY_RATE: f32 = 0.2;
@@ -105,51 +109,33 @@ fn setup(
         lumina_cooldown_material: color_materials
             .add(ColorMaterial::from(Color::srgb(0.3, 0.3, 0.3))),
         resource_mesh: meshes.add(Circle::new(20.0)).into(),
+        line_mesh: meshes.add(Mesh::from(Rectangle::default())),
     });
 }
 
-fn test_draw_lines(
-    mut gizmos: Gizmos,
+fn update_attachment_line(
     ship_transform: Single<&Transform, With<Ship>>,
-    nearby: Query<(Entity, &Transform), With<Nearby>>,
     lumina: Query<(&Transform, &Lumina)>,
     attached: Option<Single<&Attached>>,
-    links: Query<(Entity, &Lumina)>,
-    mut disjoint_set: ResMut<LuminaDisjointSet>,
     scaling: Res<Scaling>,
+    mut line: Single<
+        (Entity, &mut Transform, &AttachmentLine, &mut Visibility),
+        (Without<Lumina>, Without<Ship>),
+    >,
 ) {
     let end = ship_transform.translation.xy();
+    let mut visibility = Visibility::Hidden;
     if let Some(ref attached) = attached {
         if let Ok((lumina_transform, lumina)) = lumina.get(attached.lumina) {
             if attached.in_range || lumina.targets.len() < scaling.max_links {
                 let start = lumina_transform.translation.xy();
-                gizmos.line_2d(start, end, Color::srgb(0.0, 0.0, 1.0));
+                *line.1 = transform_for_line(start, end, 1.0);
+                visibility = Visibility::Visible;
             }
         }
     }
-
-    // TODO: remove
-    // for (nearby, nearby_transform) in nearby.iter() {
-    //     let can_link = attached.as_ref().map_or(true, |attached| {
-    //         !disjoint_set.set.is_linked(nearby, attached.lumina)
-    //     });
-    //     let start = nearby_transform.translation().xy();
-    //     let end = start + (end - start).clamp_length_max(ATTACH_DISTANCE);
-    //     let color = if can_link {
-    //         Color::srgb(0.0, 1.0, 0.0)
-    //     } else {
-    //         Color::srgb(1.0, 0.0, 0.0)
-    //     };
-    //     gizmos.line_2d(start, end, color);
-    // }
-    for (source, links) in links.iter() {
-        for target in links.targets.iter() {
-            if source < *target {
-                let start_point = lumina.get(source).unwrap().0.translation.xy();
-                let end_point = lumina.get(*target).unwrap().0.translation.xy();
-                gizmos.line_2d(start_point, end_point, Color::srgb(0.0, 0.5, 0.0));
-            }
-        }
+    if *line.3 != visibility {
+        *line.3 = visibility;
     }
 }
 
@@ -300,14 +286,20 @@ fn populate_nearby_chunks(
 }
 
 fn create_links(
+    mut commands: Commands,
     mut attached: EventReader<AttachedChangeEvent>,
-    mut lumina: Query<(Entity, &mut Lumina)>,
+    mut lumina: Query<(Entity, &Transform, &mut Lumina)>,
     mut disjoint_set: ResMut<LuminaDisjointSet>,
     scaling: Res<Scaling>,
+    resources: Res<ChunkResources>,
 ) {
     for AttachedChangeEvent { from, to } in attached.read() {
-        if let Ok([(from_entity, mut from_lumina), (to_entity, mut to_lumina)]) =
-            lumina.get_many_mut([*from, *to])
+        if let Ok(
+            [
+                (from_entity, from_transform, mut from_lumina),
+                (to_entity, to_transform, mut to_lumina),
+            ],
+        ) = lumina.get_many_mut([*from, *to])
         {
             if !disjoint_set.set.is_linked(from_entity, to_entity)
                 && from_lumina.targets.len() < scaling.max_links
@@ -316,8 +308,36 @@ fn create_links(
                 disjoint_set.set.link(from_entity, to_entity);
                 from_lumina.targets.insert(to_entity);
                 to_lumina.targets.insert(from_entity);
+                commands.spawn((
+                    StateScoped(GameState::Playing),
+                    Mesh2d(resources.line_mesh.clone()),
+                    MeshMaterial2d(resources.lumina_material.clone()),
+                    transform_for_line(
+                        from_transform.translation.xy(),
+                        to_transform.translation.xy(),
+                        1.0,
+                    ),
+                ));
             }
         }
+    }
+}
+
+fn transform_for_line(p0: Vec2, p1: Vec2, thickness: f32) -> Transform {
+    let delta = p1 - p0;
+    let length = delta.length();
+    if length < f32::EPSILON {
+        return Transform::default();
+    }
+    let direction = delta / length;
+    let midpoint = (p0 + p1) * 0.5;
+    let dir3 = Vec3::new(direction.x, direction.y, 0.0);
+    let rotation = Quat::from_rotation_arc(Vec3::X, dir3);
+
+    Transform {
+        translation: Vec3::new(midpoint.x, midpoint.y, 0.0),
+        rotation,
+        scale: Vec3::new(length, thickness, 1.0),
     }
 }
 
@@ -341,9 +361,17 @@ fn lumina_cooldown_ended(
     }
 }
 
-fn setup_game(mut commands: Commands) {
+fn setup_game(mut commands: Commands, resources: Res<ChunkResources>) {
     commands.insert_resource(Chunks::default());
     commands.insert_resource(LuminaDisjointSet::default());
+    commands.spawn((
+        AttachmentLine,
+        StateScoped(GameState::Playing),
+        Mesh2d(resources.line_mesh.clone()),
+        MeshMaterial2d(resources.lumina_material.clone()),
+        Transform::default(),
+        Visibility::Hidden,
+    ));
 }
 
 pub struct ChunksPlugin;
@@ -353,7 +381,8 @@ impl Plugin for ChunksPlugin {
         app.add_plugins(Material2dPlugin::<StarfieldMaterial>::default())
             .add_systems(
                 Update,
-                (update_nearby_lumina, test_draw_lines).run_if(in_state(GameRunState::Playing)),
+                (update_nearby_lumina, update_attachment_line)
+                    .run_if(in_state(GameRunState::Playing)),
             )
             .add_systems(
                 Update,
