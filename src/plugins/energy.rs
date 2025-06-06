@@ -207,10 +207,17 @@ pub struct EnergyPlugin;
 
 impl Plugin for EnergyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(
-            Update,
-            (generate_energy, deliver_energy, move_energy, resume_lumina)
-                .run_if(in_state(GameRunState::Playing)),
-        );
+        app.add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (generate_energy, deliver_energy, resume_lumina)
+                    .run_if(in_state(GameRunState::Playing)),
+            )
+            .add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (move_energy)
+                    .run_if(in_state(GameRunState::Playing).or(in_state(GameRunState::Ending))),
+            );
     }
 }
