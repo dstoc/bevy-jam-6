@@ -12,7 +12,6 @@ struct EnergyFill;
 
 fn setup_game(mut commands: Commands) {
     commands.spawn((
-        Name::from("Energy Text"),
         StateScoped(GameState::Playing),
         Text::new("Energy: 0.0"),
         TextFont {
@@ -28,24 +27,27 @@ fn setup_game(mut commands: Commands) {
         },
         EnergyText,
     ));
-    commands
-        .spawn((
-            Name::from("Energy Display"),
+    commands.spawn((
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::FlexStart,
+            ..default()
+        },
+        children![(
             StateScoped(GameState::Playing),
             Node {
-                position_type: PositionType::Absolute,
-                bottom: Val::Px(30.0),
-                right: Val::Px(5.0),
-                width: Val::Px(200.0),
+                width: Val::Px(300.0),
                 height: Val::Px(30.0),
                 border: UiRect::all(Val::Px(1.0)),
+                margin: UiRect::all(Val::Px(15.0)),
                 ..default()
             },
-            BackgroundColor(css::GRAY.into()),
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.5)),
             BorderColor(css::WHITE.into()),
-        ))
-        .with_children(|parent| {
-            parent.spawn((
+            children![(
                 EnergyFill,
                 Node {
                     width: Val::Percent(50.0),
@@ -53,8 +55,9 @@ fn setup_game(mut commands: Commands) {
                     ..default()
                 },
                 BackgroundColor(css::GREEN.into()),
-            ));
-        });
+            )],
+        )],
+    ));
 }
 
 fn update_energy_display(
@@ -70,10 +73,13 @@ fn update_energy_display(
 
 fn update_energy(
     ship: Single<&Ship>,
-    mut bar: Single<&mut Node, With<EnergyFill>>,
+    bar: Single<(&mut Node, &mut BackgroundColor), With<EnergyFill>>,
     scaling: Res<Scaling>,
 ) {
-    bar.width = Val::Percent(ship.energy / scaling.max_battery * 100.0);
+    let fraction = ship.energy / scaling.max_battery;
+    let (mut bar, mut background) = bar.into_inner();
+    bar.width = Val::Percent(fraction * 100.0);
+    background.0 = (css::GREEN.mix(&css::RED, 1.0 - fraction)).into();
 }
 
 pub struct EnergyDisplayPlugin;
