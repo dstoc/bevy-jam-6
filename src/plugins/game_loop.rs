@@ -5,7 +5,10 @@ use bevy_tweening::{Animator, Tween, TweenCompleted, lens::UiBackgroundColorLens
 
 use crate::{GameRunState, GameState};
 
-use super::ship::{Ship, ShipSprite};
+use super::{
+    chunks::LuminaNetwork,
+    ship::{Ship, ShipSprite},
+};
 
 pub struct GameLoopPlugin;
 
@@ -43,6 +46,27 @@ fn setup_run(mut commands: Commands, asset_server: Res<AssetServer>) {
     ));
 }
 
+#[derive(Resource, Default)]
+pub struct GameData {
+    pub runs: u32,
+    pub network_credits: u32,
+    pub last_run_network_size: u32,
+}
+
+fn check_run(
+    mut commands: Commands,
+    ship: Single<&Ship>,
+    network: Res<LuminaNetwork>,
+    mut game_data: ResMut<GameData>,
+) {
+    if ship.energy <= 0.0 {
+        commands.set_state(GameRunState::Ending);
+        game_data.runs += 1;
+        game_data.last_run_network_size = network.size;
+        game_data.network_credits += network.size;
+    }
+}
+
 // TODO: refactor transition logic into a separate file
 // FadeState is necessary to trigger removal of the overlay.
 // If we did it directly in the observer, we can get a flash
@@ -57,12 +81,6 @@ pub enum FadeState {
 
 #[derive(Component)]
 struct FadeOut;
-
-fn check_run(mut commands: Commands, ship: Single<&Ship>) {
-    if ship.energy <= 0.0 {
-        commands.set_state(GameRunState::Ending);
-    }
-}
 
 #[derive(Component)]
 struct FadeMarker;
@@ -124,6 +142,7 @@ fn reveal(mut commands: Commands, entity: Single<Entity, With<FadeMarker>>) {
 impl Plugin for GameLoopPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<FadeState>()
+            .init_resource::<GameData>()
             .add_systems(OnEnter(GameState::Playing), setup_run)
             .add_systems(Update, check_run.run_if(in_state(GameRunState::Playing)))
             .add_systems(OnEnter(FadeState::Ready), reveal)

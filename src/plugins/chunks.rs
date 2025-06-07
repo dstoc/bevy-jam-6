@@ -57,13 +57,15 @@ pub struct Lumina {
 pub struct Cooldown;
 
 #[derive(Resource)]
-struct LuminaDisjointSet {
+pub struct LuminaNetwork {
+    pub size: u32,
     set: disjoint_hash_set::DisjointHashSet<Entity>,
 }
 
-impl Default for LuminaDisjointSet {
+impl Default for LuminaNetwork {
     fn default() -> Self {
         Self {
+            size: 0,
             set: disjoint_hash_set::DisjointHashSet::new(),
         }
     }
@@ -334,7 +336,7 @@ fn create_links(
     mut commands: Commands,
     mut attached: EventReader<AttachedChangeEvent>,
     mut lumina: Query<(Entity, &Transform, &mut Lumina)>,
-    mut disjoint_set: ResMut<LuminaDisjointSet>,
+    mut network: ResMut<LuminaNetwork>,
     scaling: Res<Scaling>,
     resources: Res<ChunkResources>,
 ) {
@@ -346,11 +348,12 @@ fn create_links(
             ],
         ) = lumina.get_many_mut([*from, *to])
         {
-            if !disjoint_set.set.is_linked(from_entity, to_entity)
+            if !network.set.is_linked(from_entity, to_entity)
                 && from_lumina.targets.len() < scaling.max_links
                 && to_lumina.targets.len() < scaling.max_links
             {
-                disjoint_set.set.link(from_entity, to_entity);
+                network.size += 1;
+                network.set.link(from_entity, to_entity);
                 from_lumina.targets.insert(to_entity);
                 to_lumina.targets.insert(from_entity);
                 commands.spawn((
@@ -412,7 +415,7 @@ fn setup_game(
     mut link_materials: ResMut<Assets<LinkMaterial>>,
 ) {
     commands.insert_resource(Chunks::default());
-    commands.insert_resource(LuminaDisjointSet::default());
+    commands.insert_resource(LuminaNetwork::default());
     commands.spawn((
         AttachmentLine,
         StateScoped(GameState::Playing),
