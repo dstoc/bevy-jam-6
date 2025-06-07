@@ -7,15 +7,19 @@ use crate::{GameRunState, GameState};
 
 use super::{
     chunks::LuminaNetwork,
+    scaling::Scaling,
     ship::{Ship, ShipSprite},
 };
 
 pub struct GameLoopPlugin;
 
-fn setup_run(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup_run(mut commands: Commands, asset_server: Res<AssetServer>, scaling: Res<Scaling>) {
     commands.spawn((
         Name::from("Ship"),
-        Ship::default(),
+        Ship {
+            linear: Vec2::default(),
+            energy: scaling.max_battery,
+        },
         StateScoped(GameState::Playing),
         Transform::default(),
         Camera2d,

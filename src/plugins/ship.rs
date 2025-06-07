@@ -11,17 +11,8 @@ pub struct ShipSprite;
 
 #[derive(Component)]
 pub struct Ship {
-    linear: Vec2,
+    pub linear: Vec2,
     pub energy: f32,
-}
-
-impl Default for Ship {
-    fn default() -> Self {
-        Ship {
-            energy: 10000.0,
-            linear: Vec2::default(),
-        }
-    }
 }
 
 fn ship_movement(
