@@ -1,4 +1,4 @@
-use bevy::{input::mouse::AccumulatedMouseScroll, prelude::*};
+use bevy::{prelude::*, window::WindowResized};
 use bevy_egui::EguiPlugin;
 #[cfg(debug_assertions)]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -69,6 +69,7 @@ fn main() {
     }))
     .init_state::<AppState>()
     .insert_resource(ClearColor(Color::BLACK))
+    .insert_resource(UiScale::default())
     .add_sub_state::<GameState>()
     .add_sub_state::<GameRunState>()
     .add_plugins(MainMenuPlugin)
@@ -83,7 +84,8 @@ fn main() {
     .add_plugins(ScalingPlugin)
     .add_plugins(TweeningPlugin)
     .add_systems(Startup, setup)
-    .add_systems(Update, zoom_camera);
+    .add_systems(Update, init_camera)
+    .add_systems(Update, resize_camera);
     #[cfg(debug_assertions)]
     {
         app.add_plugins(EguiPlugin {
@@ -99,18 +101,35 @@ fn main() {
     app.run();
 }
 
-fn zoom_camera(
-    mouse_scroll: Res<AccumulatedMouseScroll>,
-    mut query: Query<&mut Projection, With<Camera>>,
-) {
-    if mouse_scroll.delta == Vec2::ZERO {
-        return;
-    }
+const WIDTH: f32 = 1280.0;
+const HEIGHT: f32 = 720.0;
+const SCALE: f32 = 1.5;
 
-    for mut projection in query.iter_mut() {
+fn init_camera(projection: Query<&mut Projection, Added<Camera2d>>, window: Single<&Window>) {
+    let scale_x = window.width() / WIDTH;
+    let scale_y = window.height() / HEIGHT;
+    let zoom = (scale_x.min(scale_y)).recip();
+    for mut projection in projection {
         if let Projection::Orthographic(ref mut ortho) = *projection {
-            ortho.scale -= mouse_scroll.delta.y * 0.1;
-            ortho.scale = ortho.scale.clamp(0.1, 10.0);
+            ortho.scale = zoom * SCALE;
+        }
+    }
+}
+
+fn resize_camera(
+    mut resize_events: EventReader<WindowResized>,
+    mut query: Query<&mut Projection, With<Camera2d>>,
+    mut ui_scale: ResMut<UiScale>,
+) {
+    for e in resize_events.read() {
+        let scale_x = e.width / WIDTH;
+        let scale_y = e.height / HEIGHT;
+        let zoom = (scale_x.min(scale_y)).recip();
+        ui_scale.0 = 1.0 / zoom;
+        for mut projection in query.iter_mut() {
+            if let Projection::Orthographic(ref mut ortho) = *projection {
+                ortho.scale = zoom * SCALE;
+            }
         }
     }
 }
