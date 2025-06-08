@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::AppState;
 
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct Scaling {
     pub reflection_probability: f32,
     pub propagation_probability: f32,

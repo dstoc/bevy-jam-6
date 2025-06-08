@@ -97,8 +97,9 @@ fn rebuild(
     commands.entity(parent).with_children(|parent| {
         parent.spawn((
             Text::new(format!(
-                "Ship Lost...\n{:?} lumina links created",
+                "Ship Lost...\n{:} lumina link{:} created",
                 story_ui.links,
+                if story_ui.links == 1 { "" } else { "s" }
             )),
             Node {
                 align_self: AlignSelf::Start,
