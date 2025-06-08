@@ -17,7 +17,7 @@ struct BatteryUpgrade;
 
 impl Upgrade for BatteryUpgrade {
     fn description(&self, _level: u32, _scaling: &Scaling) -> String {
-        "Increase ion storage".into()
+        "Research ion storage".into()
     }
     fn cost(&self, level: u32) -> u32 {
         level * 10
@@ -27,45 +27,125 @@ impl Upgrade for BatteryUpgrade {
     }
 }
 
-struct TestUpgrade;
+struct LuminaReflectionUpgrade;
 
-impl Upgrade for TestUpgrade {
+impl Upgrade for LuminaReflectionUpgrade {
     fn description(&self, _level: u32, _scaling: &Scaling) -> String {
-        "Test Upgrade".into()
+        "Research Lumina reflection".into()
     }
     fn cost(&self, level: u32) -> u32 {
         level * 2
     }
-    fn apply(&self, _level: u32, _scaling: &mut Scaling) {}
+    fn apply(&self, _level: u32, scaling: &mut Scaling) {
+        scaling.reflection_probability *= 1.1;
+    }
 }
 
-struct TestHiddenUpgrade;
+struct LuminaPropagationUpgrade;
 
-impl Upgrade for TestHiddenUpgrade {
+impl Upgrade for LuminaPropagationUpgrade {
     fn description(&self, _level: u32, _scaling: &Scaling) -> String {
-        "Test Upgrade".into()
+        "Research Lumina propagation".into()
     }
     fn cost(&self, level: u32) -> u32 {
         level * 2
     }
-    fn apply(&self, _level: u32, _scaling: &mut Scaling) {}
-    fn hidden(&self, _scaling: &Scaling, _data: &GameData) -> bool {
-        true
+    fn apply(&self, _level: u32, scaling: &mut Scaling) {
+        scaling.propagation_probability *= 1.1;
+    }
+    fn hidden(&self, scaling: &Scaling, _data: &GameData) -> bool {
+        scaling.reflection_probability < 0.6
+    }
+}
+
+struct LuminaGenerationUpgrade;
+
+impl Upgrade for LuminaGenerationUpgrade {
+    fn description(&self, _level: u32, _scaling: &Scaling) -> String {
+        "Research Lumina generation".into()
+    }
+    fn cost(&self, level: u32) -> u32 {
+        level * 3
+    }
+    fn apply(&self, _level: u32, scaling: &mut Scaling) {
+        scaling.generation_per_sec *= 1.15;
+    }
+}
+
+struct LuminaLinksUpgrade;
+
+impl Upgrade for LuminaLinksUpgrade {
+    fn description(&self, _level: u32, _scaling: &Scaling) -> String {
+        "Research max Lumina links".into()
+    }
+    fn cost(&self, level: u32) -> u32 {
+        level * 2
+    }
+    fn apply(&self, _level: u32, scaling: &mut Scaling) {
+        scaling.max_links += 1;
+    }
+    fn hidden(&self, scaling: &Scaling, _data: &GameData) -> bool {
+        scaling.propagation_probability < 0.75
+    }
+}
+
+struct LuminaCooldownUpgrade;
+
+impl Upgrade for LuminaCooldownUpgrade {
+    fn description(&self, _level: u32, _scaling: &Scaling) -> String {
+        "Research Lumina burnout".into()
+    }
+    fn cost(&self, level: u32) -> u32 {
+        level * 2
+    }
+    fn apply(&self, _level: u32, scaling: &mut Scaling) {
+        scaling.lumina_cooldown_per_generation *= 0.95;
+    }
+}
+
+struct LuminaRecoveryUpgrade;
+
+impl Upgrade for LuminaRecoveryUpgrade {
+    fn description(&self, _level: u32, _scaling: &Scaling) -> String {
+        "Research Lumina recovery".into()
+    }
+    fn cost(&self, level: u32) -> u32 {
+        level * 2
+    }
+    fn apply(&self, _level: u32, scaling: &mut Scaling) {
+        scaling.lumina_resume_per_sec *= 1.05;
+    }
+    fn hidden(&self, scaling: &Scaling, _data: &GameData) -> bool {
+        scaling.lumina_resume_per_sec < 0.075
+    }
+}
+
+struct CapacitorUpgrade;
+
+impl Upgrade for CapacitorUpgrade {
+    fn description(&self, _level: u32, _scaling: &Scaling) -> String {
+        "Research Lumina capacitors".into()
+    }
+    fn cost(&self, level: u32) -> u32 {
+        level * 5
+    }
+    fn apply(&self, _level: u32, scaling: &mut Scaling) {
+        scaling.max_capacitor += 500.0
+    }
+    fn hidden(&self, scaling: &Scaling, _data: &GameData) -> bool {
+        scaling.max_battery < 3000.0
     }
 }
 
 const UPGRADES: &[&dyn Upgrade] = &[
     &BatteryUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestUpgrade,
-    &TestHiddenUpgrade,
+    &LuminaReflectionUpgrade,
+    &LuminaPropagationUpgrade,
+    &LuminaGenerationUpgrade,
+    &LuminaLinksUpgrade,
+    &LuminaCooldownUpgrade,
+    &LuminaRecoveryUpgrade,
+    &CapacitorUpgrade,
 ];
 
 #[derive(Resource)]
@@ -119,7 +199,7 @@ fn summarise_upgrades(
     data: &GameData,
     levels: &UpgradeLevels,
 ) -> Vec<UpgradeState> {
-    UPGRADES
+    let mut states: Vec<UpgradeState> = UPGRADES
         .iter()
         .enumerate()
         .map(|(index, upgrade)| UpgradeState {
@@ -131,7 +211,14 @@ fn summarise_upgrades(
             enabled: !upgrade.hidden(&scaling, &data)
                 && upgrade.cost(levels.levels[index] + 1) <= data.network_credits,
         })
-        .collect()
+        .collect();
+    states.sort_by(|a, b| {
+        a.hidden
+            .cmp(&b.hidden)
+            .then(a.cost.cmp(&b.cost))
+            .then_with(|| a.description.cmp(&b.description))
+    });
+    states
 }
 
 fn rebuild_upgrades(mut commands: Commands, parent: Entity, upgrades: Vec<UpgradeState>) {
@@ -149,7 +236,7 @@ fn rebuild_upgrades(mut commands: Commands, parent: Entity, upgrades: Vec<Upgrad
                 Node {
                     border: UiRect::all(Val::Px(1.0)),
                     padding: UiRect::all(Val::Px(15.0)),
-                    width: Val::Px(300.0),
+                    width: Val::Px(375.0),
                     height: Val::Px(100.0),
                     ..default()
                 },

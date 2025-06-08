@@ -7,6 +7,7 @@ use bevy::ecs::spawn::SpawnWith;
 
 pub struct StoryPlugin;
 
+// TODO: attachment distance
 const STORIES: &[&str] = &[
     r#"In this sector of deep space, we've uncovered a vast field of Lumina nodes. Through dedicated research, we've engineered vessels powered solely by Lumina ions. These ships can establish links between nodes and draw ions when connected. To push our breakthroughs even further, we must extend and reinforce these links.
 
