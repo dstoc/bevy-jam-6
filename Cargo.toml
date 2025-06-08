@@ -4,13 +4,21 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.16.0", features = ["dynamic_linking", "file_watcher"] }
+bevy = { version = "0.16.0", features = ["dynamic_linking"] }
 bevy-inspector-egui = "0.31.0"
 bevy_egui = "0.34.1"
 bevy_tweening = "0.13.0"
 disjoint-hash-set = "1.0.0"
+getrandom = { version = "0.3", features = ["wasm_js"] }
 iyes_perf_ui = "0.5.0"
 rand = "0.9.1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies.bevy]
+version = "0.16.0"
+features = ["file_watcher"]
+
+[package.metadata.bevy_cli.web]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
 
 [profile.dev]
 opt-level = 1

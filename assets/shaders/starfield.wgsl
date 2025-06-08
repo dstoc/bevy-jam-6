@@ -8,7 +8,7 @@
 }
 
 struct CustomMaterial {
-    camera: vec2<f32>,
+    camera: vec4<f32>,
 };
 
 @group(2) @binding(0)
@@ -32,7 +32,7 @@ fn fragment(
     let layer: f32 = floor(seed0 * f32(LAYERS));
     let parallax = (layer + 1) * 0.1;
 
-    let world_pos = in.world_position.xy + mat.camera * parallax;
+    let world_pos = in.world_position.xy + mat.camera.xy * parallax;
 
     let st = world_pos * grid_size;
     let cell = floor(st);
@@ -53,7 +53,10 @@ fn fragment(
         let tw = 0.5 + 0.5 * sin(phase);
         let intensity = (1.0 - d / star_radius) * tw;
         color = vec3<f32>(intensity);
+        return vec4<f32>(vec3<f32>(1.0), intensity);
+    } else {
+        return vec4<f32>(0.0);
+        
     }
 
-    return vec4<f32>(color, 1.0);
 }

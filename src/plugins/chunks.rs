@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
     reflect::TypePath,
     render::render_resource::{AsBindGroup, ShaderRef},
-    sprite::{Material2d, Material2dPlugin},
+    sprite::{AlphaMode2d, Material2d, Material2dPlugin},
 };
 use rand::prelude::*;
 
@@ -14,15 +14,18 @@ use crate::{
 
 use super::{scaling::Scaling, ship::Ship};
 
-#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone, Default)]
 struct StarfieldMaterial {
     #[uniform(0)]
-    pub camera: Vec2,
+    pub camera: Vec4,
 }
 
 impl Material2d for StarfieldMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/starfield.wgsl".into()
+    }
+    fn alpha_mode(&self) -> AlphaMode2d {
+        AlphaMode2d::Blend
     }
 }
 
@@ -108,9 +111,7 @@ fn setup(
     mut lumina_materials: ResMut<Assets<LuminaMaterial>>,
 ) {
     commands.insert_resource(ChunkResources {
-        material: starfield_materials.add(StarfieldMaterial {
-            camera: Vec2::default(),
-        }),
+        material: starfield_materials.add(StarfieldMaterial::default()),
         mesh: meshes.add(Rectangle {
             half_size: Vec2 {
                 x: CHUNK_SIZE / 2.0,
@@ -146,7 +147,7 @@ fn update_starfield(
     mut starfield_materials: ResMut<Assets<StarfieldMaterial>>,
 ) {
     let material = starfield_materials.get_mut(&resources.material).unwrap();
-    material.camera = camera_transform.translation.xy();
+    material.camera = camera_transform.translation.extend(0.0);
 }
 
 fn update_attachment_line(
