@@ -44,14 +44,14 @@ fn ship_movement(
             let force = ship.energy.min(force_magnitude * dt);
             ship.linear += direction * force;
             ship.energy -= force * scaling.energy_per_force;
-            ship_sprite.rotation = Quat::from_rotation_z(direction.to_angle() - FRAC_PI_2);
+            ship_sprite.rotation = Quat::from_rotation_z(direction.to_angle() + FRAC_PI_2);
         } else if buttons.pressed(MouseButton::Right) {
             if ship.linear.length_squared() > f32::EPSILON {
                 let force = ship.energy.min(force_magnitude * dt);
                 let braking_force_vector = -ship.linear.normalize() * force;
                 ship.energy -= force * scaling.energy_per_force;
                 ship_sprite.rotation =
-                    Quat::from_rotation_z(braking_force_vector.to_angle() - FRAC_PI_2);
+                    Quat::from_rotation_z(braking_force_vector.to_angle() + FRAC_PI_2);
                 if ship.linear.dot(ship.linear + braking_force_vector) < 0.0 {
                     ship.linear = Vec2::ZERO;
                 } else {
