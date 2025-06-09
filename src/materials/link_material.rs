@@ -21,8 +21,6 @@ impl Material2d for LinkMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/link.wgsl".into()
     }
-    // TODO: blend + bloom seems broken in webgl
-    #[cfg(not(target_arch = "wasm32"))]
     fn alpha_mode(&self) -> AlphaMode2d {
         AlphaMode2d::Blend
     }

@@ -72,9 +72,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         color += mat.base_color * line;
     }
 
-
-    return color * mat.bloom;
-    // return vec4<f32>(1.0, 1.0, 1.0, line);
+    return vec4<f32>(color.xyz * mat.bloom, clamp(color.w, 0.0, 1.0));
 }
 
 
