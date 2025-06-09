@@ -7,7 +7,7 @@ use super::{
     scaling::Scaling,
     ship::{Ship, ShipSprite},
 };
-use bevy::prelude::*;
+use bevy::{audio::Volume, prelude::*};
 use bevy_tweening::{Animator, Tween, lens::SpriteColorLens};
 use rand::Rng;
 
@@ -15,6 +15,10 @@ use rand::Rng;
 struct EnergyResources {
     mesh: Handle<Mesh>,
     material: Handle<LuminaMaterial>,
+    generate_sound: Handle<AudioSource>,
+    reflect_sound: Handle<AudioSource>,
+    charge_sound: Handle<AudioSource>,
+    propagate_sound: Handle<AudioSource>,
 }
 
 #[derive(Component)]
@@ -64,10 +68,18 @@ fn generate_energy(
         if cooldown.contains(attached.lumina) {
             return;
         }
+        let mut generated = false;
         for target in lumina.targets.iter() {
             if rand::rng().random_range(0.0..1.0) > scaling.generation_per_sec * time.delta_secs() {
                 continue;
             }
+            if !generated {
+                commands.spawn((
+                    AudioPlayer::new(resources.generate_sound.clone()),
+                    PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.5)),
+                ));
+            }
+            generated = true;
             commands.spawn((
                 Energy {
                     target: *target,
@@ -95,11 +107,14 @@ const SPEED: f32 = 500.0;
 fn move_energy(
     mut commands: Commands,
     time: Res<Time>,
-    energy: Query<(Entity, &mut Transform, &mut Energy), Without<Lumina>>,
+    energy: Query<(Entity, &mut Transform, &mut Energy), (Without<Lumina>, Without<Ship>)>,
     lumina: Query<(&Transform, &Lumina)>,
     resources: Res<EnergyResources>,
     scaling: Res<Scaling>,
+    ship: Single<&Transform, With<Ship>>,
 ) {
+    let mut reflected: f32 = f32::INFINITY;
+    let mut propagated: f32 = f32::INFINITY;
     for (entity, mut transform, mut energy) in energy {
         if energy.path.is_empty() {
             continue;
@@ -144,6 +159,11 @@ fn move_energy(
                     } else {
                         all_terminated = false;
                     }
+                    if *target == from {
+                        reflected = reflected.min(from_pos.distance(ship.translation.xy()));
+                    } else {
+                        propagated = propagated.min(from_pos.distance(ship.translation.xy()));
+                    }
                     let mut path = energy.path.clone();
                     path.push(to);
                     commands.spawn((
@@ -169,6 +189,20 @@ fn move_energy(
             }
         }
     }
+
+    if reflected < 1000.0 {
+        commands.spawn((
+            AudioPlayer::new(resources.reflect_sound.clone()),
+            PlaybackSettings::DESPAWN
+                .with_volume(Volume::Linear(0.5 * ((1000.0 - reflected) / 1000.0))),
+        ));
+    } else if propagated < 1000.0 {
+        commands.spawn((
+            AudioPlayer::new(resources.propagate_sound.clone()),
+            PlaybackSettings::DESPAWN
+                .with_volume(Volume::Linear(0.5 * ((1000.0 - propagated) / 1000.0))),
+        ));
+    }
 }
 
 fn deliver_energy(
@@ -178,6 +212,7 @@ fn deliver_energy(
     energy: Query<(Entity, &mut Energy)>,
     scaling: Res<Scaling>,
     ship_sprite: Single<Entity, With<ShipSprite>>,
+    resources: Res<EnergyResources>,
 ) {
     let mut animate = false;
     for (entity, energy) in energy {
@@ -204,6 +239,10 @@ fn deliver_energy(
     }
     ship.energy = ship.energy.min(scaling.max_battery + scaling.max_capacitor);
     if animate {
+        commands.spawn((
+            AudioPlayer::new(resources.charge_sound.clone()),
+            PlaybackSettings::DESPAWN.with_volume(Volume::Linear(0.15)),
+        ));
         commands.entity(*ship_sprite).insert(Animator::new(
             Tween::new(
                 EaseFunction::QuinticIn,
@@ -229,6 +268,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut lumina_materials: ResMut<Assets<LuminaMaterial>>,
+    server: Res<AssetServer>,
 ) {
     commands.insert_resource(EnergyResources {
         material: lumina_materials.add(LuminaMaterial {
@@ -238,6 +278,10 @@ fn setup(
             freq: 2.0,
         }),
         mesh: meshes.add(Circle::new(10.0)).into(),
+        charge_sound: server.load("charge.ogg"),
+        generate_sound: server.load("generate.ogg"),
+        propagate_sound: server.load("propagate.ogg"),
+        reflect_sound: server.load("reflect.ogg"),
     });
 }
 
