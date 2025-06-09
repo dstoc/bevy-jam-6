@@ -15,9 +15,9 @@ Left click applies a force in the direction of the mouse pointer.
 Right click applies an automatic braking force opposite the direction of motion.
 
 Be gentle, energy is limited."#,
-    "Our ships only draw ions when they are close to a Lumina node. We need to balance forging new links with regular stops at nodes to recharge.",
+    "Our ships can only draw ions when they are close to a Lumina node. We need to balance forging new links with regular stops at nodes to recharge.",
     "Our grasp of Lumina is still in its infancy. We've learned how to trigger ion bursts by linking a ship, and watched as those ions propagate outward before folding back to their origin. The effect is striking but fickle. Each trial yields unpredictable results. With deeper study, however, we're confident we can improve the consistency.",
-    "It should be obvious that repeated ion bursts can temporarily shut down a Lumina node. While offline, the node will still propagate and reflect ions but won't generate new ones until the ship is detached and some amount of time has elapsed. Early efforts to work around this shutdown are promising, but further research is needed.",
+    "It should be obvious that repeated ion bursts can temporarily shut down a Lumina node. While offline, the node will still propagate and reflect ions but won't generate more until the ship is detached and some amount of time has elapsed. Early efforts to work around this shutdown are promising, but further research is needed.",
     "In this area the ship's life-support is tied to the the distance from the point of entry. We'll need to develop further efficiencies before we can venture further.",
     "Our technology can't yet sustain unlimited links from a single Lumina node. To prevent catastrophic overloads, each node is capped at a strict connection limit. Exceeding it would result in stability collapses and a dangerous feedback loop.\n\nWe need more link data to advance our research.",
     "No further transmissions available.\n\nContinue research.",

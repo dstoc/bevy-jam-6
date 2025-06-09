@@ -39,6 +39,9 @@ impl Upgrade for LuminaReflectionUpgrade {
     fn apply(&self, _level: u32, scaling: &mut Scaling) {
         scaling.reflection_probability *= 1.1;
     }
+    fn hidden(&self, _scaling: &Scaling, data: &GameData) -> bool {
+        data.runs < 3
+    }
 }
 
 struct LuminaPropagationUpgrade;
@@ -101,6 +104,9 @@ impl Upgrade for LuminaCooldownUpgrade {
     fn apply(&self, _level: u32, scaling: &mut Scaling) {
         scaling.lumina_cooldown_per_generation *= 0.95;
     }
+    fn hidden(&self, _scaling: &Scaling, data: &GameData) -> bool {
+        data.runs < 4
+    }
 }
 
 struct LuminaRecoveryUpgrade;
@@ -116,7 +122,7 @@ impl Upgrade for LuminaRecoveryUpgrade {
         scaling.lumina_resume_per_sec *= 1.05;
     }
     fn hidden(&self, scaling: &Scaling, _data: &GameData) -> bool {
-        scaling.lumina_resume_per_sec < 0.075
+        scaling.lumina_cooldown_per_generation > 0.075
     }
 }
 
