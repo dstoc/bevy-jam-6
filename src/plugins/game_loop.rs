@@ -21,7 +21,7 @@ fn setup_run(mut commands: Commands, asset_server: Res<AssetServer>, scaling: Re
             energy: scaling.max_battery,
         },
         StateScoped(GameState::Playing),
-        Transform::default(),
+        Transform::from_xyz(0.0, 0.0, 3.0),
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             scale: 1.5,
