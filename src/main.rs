@@ -1,4 +1,5 @@
 use bevy::{prelude::*, window::WindowResized};
+#[cfg(debug_assertions)]
 use bevy_egui::EguiPlugin;
 #[cfg(debug_assertions)]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
