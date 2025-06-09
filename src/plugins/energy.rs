@@ -160,9 +160,9 @@ fn move_energy(
                         all_terminated = false;
                     }
                     if *target == from {
-                        reflected = reflected.min(from_pos.distance(ship.translation.xy()));
+                        reflected = reflected.min(to_pos.distance(ship.translation.xy()));
                     } else {
-                        propagated = propagated.min(from_pos.distance(ship.translation.xy()));
+                        propagated = propagated.min(to_pos.distance(ship.translation.xy()));
                     }
                     let mut path = energy.path.clone();
                     path.push(to);
