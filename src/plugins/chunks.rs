@@ -101,7 +101,7 @@ const CHUNK_SIZE: f32 = 5000.0;
 const CELLS_PER_CHUNK: i32 = 10;
 const RESOURCE_DECAY_RATE: f32 = 0.2;
 const NEARBY_DISTANCE: f32 = 300.0;
-const ATTACH_DISTANCE: f32 = 100.0;
+const ATTACH_DISTANCE: f32 = 200.0;
 
 fn setup(
     mut commands: Commands,
@@ -174,10 +174,12 @@ fn update_attachment_line(
                 *line.0 = transform_for_line(start, end, 20.0);
                 visibility = Visibility::Visible;
                 let link_material = link_materials.get_mut(&line.2.0).unwrap();
-                link_material.base_color = if attached.in_range {
-                    LinearRgba::rgb(0.0, 0.15, 0.4)
+                if attached.in_range {
+                    link_material.base_color = LinearRgba::rgb(0.0, 0.15, 0.4);
+                    link_material.bloom = 5.0;
                 } else {
-                    LinearRgba::rgb(0.1, 0.1, 0.1)
+                    link_material.base_color = LinearRgba::rgb(0.1, 0.1, 0.1);
+                    link_material.bloom = 1.0;
                 };
             }
         }
@@ -423,7 +425,7 @@ fn setup_game(
         Mesh2d(resources.line_mesh.clone()),
         MeshMaterial2d(link_materials.add(LinkMaterial {
             base_color: LinearRgba::rgb(0.0, 1.0, 1.0),
-            bloom: 1.0,
+            bloom: 5.0,
             noise_freq: 0.02,
             noise_speed: 2.0,
         })),
