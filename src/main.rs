@@ -84,7 +84,6 @@ fn main() {
     .add_plugins(EnergyDisplayPlugin)
     .add_plugins(ScalingPlugin)
     .add_plugins(TweeningPlugin)
-    .add_systems(Startup, setup)
     .add_systems(Update, init_camera)
     .add_systems(Update, resize_camera);
     #[cfg(debug_assertions)]
@@ -92,6 +91,7 @@ fn main() {
         app.add_plugins(EguiPlugin {
             enable_multipass_for_primary_context: true,
         })
+        .add_systems(Startup, setup_perfui)
         .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(bevy::diagnostic::FrameTimeDiagnosticsPlugin::default())
         .add_plugins(bevy::diagnostic::EntityCountDiagnosticsPlugin)
@@ -135,9 +135,7 @@ fn resize_camera(
     }
 }
 
-fn setup(mut commands: Commands) {
-    #[cfg(debug_assertions)]
-    {
-        commands.spawn(PerfUiDefaultEntries::default());
-    }
+#[cfg(debug_assertions)]
+fn setup_perfui(mut commands: Commands) {
+    commands.spawn(PerfUiDefaultEntries::default());
 }

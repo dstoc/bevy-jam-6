@@ -23,7 +23,7 @@ fn pause(mut commands: Commands) {
     commands.set_state(GameRunState::Paused);
 }
 
-#[cfg(debug_assertions)]
+#[cfg(not(target_arch = "wasm32"))]
 fn quit_game(_trigger: Trigger<Pointer<Click>>, mut exit_events: EventWriter<AppExit>) {
     exit_events.write(AppExit::default());
 }
