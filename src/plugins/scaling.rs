@@ -27,7 +27,7 @@ impl Default for Scaling {
             max_links: 3,
             max_battery: 1500.0,
             max_capacitor: 0.0,
-            capacitor_drain_per_sec: 1000.0,
+            capacitor_drain_per_sec: 150.0,
             energy_extraction: 0.1,
             energy_per_force: 1.0,
             lumina_cooldown_per_generation: 0.1,
