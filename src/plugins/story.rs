@@ -35,17 +35,26 @@ fn shop(_trigger: Trigger<Pointer<Click>>, mut commands: Commands) {
     commands.set_state(GameState::Shop);
 }
 
-fn next(_trigger: Trigger<Pointer<Click>>, mut story_ui: Single<&mut StoryUi>) {
+fn next(
+    _trigger: Trigger<Pointer<Click>>,
+    mut story_ui: Single<&mut StoryUi>,
+    mut commands: Commands,
+) {
     story_ui.current += 1;
+    commands.run_system_cached(rebuild);
 }
 
-fn prev(_trigger: Trigger<Pointer<Click>>, mut story_ui: Single<&mut StoryUi>) {
+fn prev(
+    _trigger: Trigger<Pointer<Click>>,
+    mut story_ui: Single<&mut StoryUi>,
+    mut commands: Commands,
+) {
     story_ui.current -= 1;
+    commands.run_system_cached(rebuild);
 }
 
 fn setup(mut commands: Commands, data: Res<GameData>) {
     commands.spawn((
-        Name::from("STORY"),
         StoryUi {
             links: data.last_run_network_size,
             current: (data.runs as usize - 1).min(STORIES.len() - 1),
@@ -63,6 +72,7 @@ fn setup(mut commands: Commands, data: Res<GameData>) {
         },
         Camera2d,
     ));
+    commands.run_system_cached(rebuild);
 }
 
 fn next_prev_button(text: &str, enabled: bool) -> impl Bundle {
@@ -87,10 +97,7 @@ fn next_prev_button(text: &str, enabled: bool) -> impl Bundle {
     )
 }
 
-fn rebuild(
-    mut commands: Commands,
-    query: Single<(Entity, &StoryUi), Or<(Changed<StoryUi>, Added<StoryUi>)>>,
-) {
+fn rebuild(mut commands: Commands, query: Single<(Entity, &StoryUi), Changed<StoryUi>>) {
     let (parent, story_ui) = query.into_inner();
     let has_next = story_ui.current < story_ui.max;
     let has_prev = story_ui.current > 0;
@@ -165,6 +172,5 @@ fn rebuild(
 impl Plugin for StoryPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(GameState::Story), setup);
-        app.add_systems(Update, rebuild);
     }
 }

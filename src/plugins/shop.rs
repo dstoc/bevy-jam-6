@@ -182,11 +182,10 @@ fn go_next(_trigger: Trigger<Pointer<Click>>, mut commands: Commands) {
 fn upgrade_clicked(
     trigger: Trigger<Pointer<Click>>,
     upgrade_state: Query<&UpgradeState>,
+    mut commands: Commands,
     mut scaling: ResMut<Scaling>,
     mut data: ResMut<GameData>,
     mut levels: ResMut<UpgradeLevels>,
-    commands: Commands,
-    upgrade_container: Single<Entity, With<UpgradeContainer>>,
 ) {
     let upgrade_state = upgrade_state.get(trigger.target()).unwrap();
     let level: u32 = levels.levels[upgrade_state.index];
@@ -196,8 +195,8 @@ fn upgrade_clicked(
     upgrade.apply(next_level, scaling.as_mut());
     data.network_credits -= upgrade.cost(next_level);
 
-    let upgrades = summarise_upgrades(&scaling, &data, &levels);
-    rebuild_upgrades(commands, *upgrade_container, upgrades);
+    commands.run_system_cached(rebuild_upgrades);
+    commands.run_system_cached(update_link_text);
 }
 
 fn summarise_upgrades(
@@ -227,10 +226,17 @@ fn summarise_upgrades(
     states
 }
 
-fn rebuild_upgrades(mut commands: Commands, parent: Entity, upgrades: Vec<UpgradeState>) {
-    commands.entity(parent).despawn_related::<Children>();
+fn rebuild_upgrades(
+    mut commands: Commands,
+    parent: Single<Entity, With<UpgradeContainer>>,
+    scaling: ResMut<Scaling>,
+    data: ResMut<GameData>,
+    levels: ResMut<UpgradeLevels>,
+) {
+    let upgrades = summarise_upgrades(&scaling, &data, &levels);
+    commands.entity(*parent).despawn_related::<Children>();
 
-    commands.entity(parent).with_children(|parent| {
+    commands.entity(*parent).with_children(|parent| {
         for state in upgrades {
             let enabled = state.enabled;
             let color = if enabled {
@@ -270,14 +276,7 @@ fn rebuild_upgrades(mut commands: Commands, parent: Entity, upgrades: Vec<Upgrad
     });
 }
 
-fn setup(
-    mut commands: Commands,
-    scaling: Res<Scaling>,
-    data: Res<GameData>,
-    levels: Res<UpgradeLevels>,
-) {
-    let upgrades = summarise_upgrades(&scaling, &data, &levels);
-    let mut upgrade_container = None;
+fn setup(mut commands: Commands, data: Res<GameData>) {
     commands.spawn((Camera2d, StateScoped(GameState::Shop)));
     commands
         .spawn((
@@ -289,38 +288,36 @@ fn setup(
                 justify_content: JustifyContent::Center,
                 ..default()
             },
-            children![(
-                Node {
-                    position_type: PositionType::Absolute,
-                    bottom: Val::Px(35.0),
-                    width: Val::Percent(100.0),
-                    ..default()
-                },
-                TextLayout::new_with_justify(JustifyText::Center),
-                LinksText,
-                Text::new(format!(
-                    "{:} lumina link{:}",
-                    data.network_credits,
-                    if data.network_credits == 1 { "" } else { "s" }
-                )),
-            )],
+            children![
+                (
+                    Node {
+                        position_type: PositionType::Absolute,
+                        bottom: Val::Px(35.0),
+                        width: Val::Percent(100.0),
+                        ..default()
+                    },
+                    TextLayout::new_with_justify(JustifyText::Center),
+                    LinksText,
+                    Text::new(format!(
+                        "{:} lumina link{:}",
+                        data.network_credits,
+                        if data.network_credits == 1 { "" } else { "s" }
+                    )),
+                ),
+                (
+                    UpgradeContainer,
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        flex_wrap: FlexWrap::Wrap,
+                        row_gap: Val::Px(10.0),
+                        column_gap: Val::Px(10.0),
+                        height: Val::Px(600.0),
+                        ..default()
+                    },
+                )
+            ],
         ))
         .with_children(|parent| {
-            upgrade_container = Some(
-                parent
-                    .spawn((
-                        UpgradeContainer,
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            flex_wrap: FlexWrap::Wrap,
-                            row_gap: Val::Px(10.0),
-                            column_gap: Val::Px(10.0),
-                            height: Val::Px(600.0),
-                            ..default()
-                        },
-                    ))
-                    .id(),
-            );
             parent
                 .spawn((
                     Button,
@@ -342,9 +339,7 @@ fn setup(
                 .observe(go_next);
         });
 
-    // TODO: I couldn't figure out a way to be able to call this helper from
-    // inside `with_children`.
-    rebuild_upgrades(commands, upgrade_container.unwrap(), upgrades);
+    commands.run_system_cached(rebuild_upgrades);
 }
 
 fn update_link_text(mut text: Single<&mut Text, With<LinksText>>, data: Res<GameData>) {
@@ -367,9 +362,5 @@ impl Plugin for ShopPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::InGame), setup_game);
         app.add_systems(OnEnter(GameState::Shop), setup);
-        app.add_systems(
-            Update,
-            update_link_text.run_if(in_state(GameState::Shop).and(resource_changed::<GameData>)),
-        );
     }
 }
